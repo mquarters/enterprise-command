@@ -63,6 +63,15 @@ module.exports = {
         'glow-critical': '0 0 25px var(--status-critical-glow)',
         'glow-warning': '0 0 20px var(--status-warning-glow)',
         'glow-healthy': '0 0 15px var(--status-healthy-glow)',
+        'drawer': 'var(--shadow-drawer)',
+      },
+      zIndex: {
+        'drawer': 'var(--z-drawer)',
+        'detail': 'var(--z-detail-drawer)',
+      },
+      width: {
+        'drawer-process': 'var(--drawer-width-process)',
+        'drawer-entity': 'var(--drawer-width-entity)',
       },
     },
   },

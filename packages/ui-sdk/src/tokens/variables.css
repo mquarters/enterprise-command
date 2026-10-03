@@ -23,6 +23,13 @@
   --text-muted: #64748b;         /* De-emphasized captions, legend text */
   --scrim: rgba(2, 6, 23, 0.6);  /* Drawer overlay scrim */
 
+  /* -- Drawer geometry (single source; no hard-coded z/width in components) -- */
+  --z-drawer: 900;               /* process-scale drawer layer */
+  --z-detail-drawer: 1000;       /* sub-entity drawer, stacked above the process drawer */
+  --drawer-width-process: 480px; /* process-scale drawer width */
+  --drawer-width-entity: 340px;  /* sub-entity drawer width */
+  --shadow-drawer: -10px 0 30px rgba(0, 0, 0, 0.7); /* drawer elevation */
+
   /* ==========================================================================
      2. SEMANTIC STATUS TOKENS (High Contrast & TV Wall Glows)
      ========================================================================== */

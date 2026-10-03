@@ -4,6 +4,16 @@ export * from './types';
 // Re-export plugin registration utilities
 export { pluginRegistry, defineProcessPlugin } from './plugin-registry';
 
+// Scale-agnostic viewing primitives (viewing MODES, not data tiers)
+export { DrawerShell } from './components/primitives/DrawerShell';
+export type { DrawerShellProps } from './components/primitives/DrawerShell';
+export { OverviewTile } from './components/primitives/OverviewTile';
+export type { OverviewTileProps } from './components/primitives/OverviewTile';
+export { DetailDrawer } from './components/primitives/DetailDrawer';
+export type { DetailDrawerProps } from './components/primitives/DetailDrawer';
+export { ArchetypeCanvas } from './components/primitives/ArchetypeCanvas';
+export type { ArchetypeCanvasProps } from './components/primitives/ArchetypeCanvas';
+
 // Re-export UI View Primitives
 // Tier L1 — Wall Display micro-component
 export { ProcessTile } from './components/L1/ProcessTile';

@@ -48,7 +48,8 @@
 }
 
 /* Tier L2: Narrative Incident Banner */
-.l2-narrative-banner {
+.l2-narrative-banner,
+.detail-narrative {
   background-color: rgba(15, 23, 42, 0.6);
   border-left: 4px solid var(--border-strong);
   padding: 1rem;
@@ -58,7 +59,8 @@
   color: var(--text-primary);
 }
 
-.l2-narrative-banner[data-health="CRITICAL"] {
+.l2-narrative-banner[data-health="CRITICAL"],
+.detail-narrative[data-health="CRITICAL"] {
   border-left-color: var(--status-critical-border);
   background-color: var(--status-critical-bg);
 }
