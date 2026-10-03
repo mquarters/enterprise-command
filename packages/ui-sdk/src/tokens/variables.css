@@ -11,8 +11,17 @@
   --surface-card: #121824;       /* L1 Tile & L3 Canvas surface */
   --surface-overlay: #1e293b;    /* L2 Drawer & Modal surface */
   --surface-elevated: #334155;   /* Hover / Active elevated state */
-  --border-subtle: #1e293b;      /* Default card borders */
+  --surface-hover: #3b4a63;      /* Button hover on elevated surfaces */
+  --border-subtle: #2b3b52;      /* Default card borders (distinct from overlay surface) */
   --border-strong: #475569;      /* Focused element borders */
+
+  /* ==========================================================================
+     1b. FOREGROUND TEXT & SCRIM TOKENS (neutral ink — not semantic status)
+     ========================================================================== */
+  --text-primary: #f1f5f9;       /* Primary values, titles, body on card surfaces */
+  --text-secondary: #94a3b8;     /* Labels, secondary values */
+  --text-muted: #64748b;         /* De-emphasized captions, legend text */
+  --scrim: rgba(2, 6, 23, 0.6);  /* Drawer overlay scrim */
 
   /* ==========================================================================
      2. SEMANTIC STATUS TOKENS (High Contrast & TV Wall Glows)
@@ -55,8 +64,8 @@
   --font-size-console: 0.75rem;   /* 12px - Monospace Logs & Telemetry */
 
   /* Font Families */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 }
 
 /* ==========================================================================

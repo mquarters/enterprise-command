@@ -10,6 +10,19 @@ module.exports = {
           card: 'var(--surface-card)',
           overlay: 'var(--surface-overlay)',
           elevated: 'var(--surface-elevated)',
+          hover: 'var(--surface-hover)',
+        },
+        ink: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+        },
+        scrim: 'var(--scrim)',
+        // Named border colors: makes `border-border-subtle` / `border-border-strong`
+        // resolve to real values instead of falling back to preflight's #e5e7eb.
+        border: {
+          subtle: 'var(--border-subtle)',
+          strong: 'var(--border-strong)',
         },
         status: {
           critical: {
