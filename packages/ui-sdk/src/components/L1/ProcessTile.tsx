@@ -61,7 +61,7 @@ export const ProcessTile: React.FC<ProcessTileProps> = ({
       data-health={health}
       data-stale={stale ? 'true' : undefined}
       onClick={() => onSelect?.(processId)}
-      className="l1-process-card w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+      className="l1-process-card w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
       style={{
         opacity: stale ? 0.35 : 1,
         filter: stale ? 'grayscale(0.9)' : undefined,
@@ -72,7 +72,7 @@ export const ProcessTile: React.FC<ProcessTileProps> = ({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-tv-title font-bold truncate">{title}</h2>
-          {ownerTeam && <p className="text-tv-sub text-slate-400">{ownerTeam}</p>}
+          {ownerTeam && <p className="text-tv-sub text-ink-secondary">{ownerTeam}</p>}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <span
@@ -85,7 +85,7 @@ export const ProcessTile: React.FC<ProcessTileProps> = ({
           >
             {health}
           </span>
-          <span className="font-mono text-tv-sub text-slate-300" aria-hidden="true">
+          <span className="font-mono text-tv-sub text-ink-primary" aria-hidden="true">
             {TREND_GLYPH[summary.trend]}
           </span>
         </div>
@@ -99,7 +99,7 @@ export const ProcessTile: React.FC<ProcessTileProps> = ({
         >
           {summary.heroMetricValue}
         </span>
-        <span className="text-tv-sub text-slate-400">{heroLabel}</span>
+        <span className="text-tv-sub text-ink-secondary">{heroLabel}</span>
       </div>
     </button>
   );

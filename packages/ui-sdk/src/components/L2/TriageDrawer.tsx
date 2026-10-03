@@ -90,7 +90,7 @@ export const L2BlastRadiusBadge: React.FC<{
     >
       {impactedCount.toLocaleString()}
     </span>
-    <span className="text-desk-body text-slate-300">{impactedUnit} impacted</span>
+    <span className="text-desk-body text-ink-primary">{impactedUnit} impacted</span>
   </div>
 );
 
@@ -144,7 +144,7 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
     <>
       {/* Backdrop — click to dismiss */}
       <div
-        className="fixed inset-0 bg-black/60"
+        className="fixed inset-0 bg-scrim"
         style={{ zIndex: 900 }}
         onClick={onClose}
         aria-hidden="true"
@@ -159,8 +159,8 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
         {/* Drawer header */}
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-desk-title font-bold text-slate-100">{header.title}</h2>
-            <p className="text-console text-slate-400">
+            <h2 className="text-desk-title font-bold text-ink-primary">{header.title}</h2>
+            <p className="text-console text-ink-secondary">
               {header.ownerTeam} · {header.processId}
             </p>
           </div>
@@ -202,7 +202,7 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
         {/* Deep links */}
         {payload.smartLaunchers && payload.smartLaunchers.length > 0 && (
           <section>
-            <h3 className="text-console text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className="text-console text-ink-secondary uppercase tracking-wider mb-2">
               Deep Links
             </h3>
             <SmartLauncherGroup launchers={payload.smartLaunchers} payload={payload} />
@@ -218,7 +218,7 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
           >
             🔬 Launch SRE Workbench (L3)
           </button>
-          <p className="text-console text-slate-500 text-center">
+          <p className="text-console text-ink-muted text-center">
             Esc to close · Data updated{' '}
             {new Date(header.updatedAt).toLocaleTimeString()}
           </p>

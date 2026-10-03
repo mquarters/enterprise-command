@@ -8,11 +8,11 @@ export const RuleGateArchetype: React.FC<RuleGateArchetypeProps> = ({
   const failedRules = data.rules.filter((r) => !r.passed);
 
   return (
-    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-white">
+    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-ink-primary">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="text-desk-title font-bold">{data.policyName}</h3>
-          <p className="text-console text-slate-400">Policy ID: {data.policyId}</p>
+          <p className="text-console text-ink-secondary">Policy ID: {data.policyId}</p>
         </div>
         <span className="text-console font-mono">
           {data.rules.length - failedRules.length} / {data.rules.length} Passed
@@ -23,7 +23,7 @@ export const RuleGateArchetype: React.FC<RuleGateArchetypeProps> = ({
       <div className="overflow-x-auto my-4">
         <table className="w-full text-left text-console border-collapse">
           <thead>
-            <tr className="border-b border-border-strong text-slate-400">
+            <tr className="border-b border-border-strong text-ink-secondary">
               <th className="py-2 px-3">Rule</th>
               <th className="py-2 px-3">Condition</th>
               <th className="py-2 px-3">Actual vs Target</th>
@@ -34,19 +34,19 @@ export const RuleGateArchetype: React.FC<RuleGateArchetypeProps> = ({
             {data.rules.map((rule) => (
               <tr key={rule.ruleId} className="border-b border-border-subtle hover:bg-surface-elevated">
                 <td className="py-3 px-3 font-semibold">{rule.description}</td>
-                <td className="py-3 px-3 font-mono text-slate-300">{rule.condition}</td>
+                <td className="py-3 px-3 font-mono text-ink-primary">{rule.condition}</td>
                 <td className="py-3 px-3 font-mono">
                   <span className={rule.passed ? 'text-status-healthy-fg' : 'text-status-critical-fg'}>
                     {rule.actualValue}
                   </span>
-                  <span className="text-slate-500"> / {rule.targetValue}</span>
+                  <span className="text-ink-muted"> / {rule.targetValue}</span>
                 </td>
                 <td className="py-3 px-3">
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    className={`px-2 py-0.5 rounded text-console font-bold ${
                       rule.passed
-                        ? 'bg-green-950 text-status-healthy-fg border border-status-healthy-border'
-                        : 'bg-red-950 text-status-critical-fg border border-status-critical-border'
+                        ? 'bg-status-healthy-bg text-status-healthy-fg border border-status-healthy-border'
+                        : 'bg-status-critical-bg text-status-critical-fg border border-status-critical-border'
                     }`}
                   >
                     {rule.passed ? 'PASSED' : 'FAILED'}

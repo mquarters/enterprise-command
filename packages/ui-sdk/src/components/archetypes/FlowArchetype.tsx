@@ -8,11 +8,11 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
   onExecuteMitigation,
 }) => {
   return (
-    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-white">
+    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-ink-primary">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-desk-title font-bold">Execution Flow Topology</h3>
-          <p className="text-console text-slate-400">Process ID: {processId}</p>
+          <p className="text-console text-ink-secondary">Process ID: {processId}</p>
         </div>
         <span
           className="px-3 py-1 text-console font-mono rounded-full font-semibold"
@@ -38,8 +38,8 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
                 data-status={node.status}
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-semibold text-sm">{node.label}</span>
-                  <span className="text-[10px] opacity-75">{node.id}</span>
+                  <span className="font-semibold text-desk-body">{node.label}</span>
+                  <span className="text-console opacity-75">{node.id}</span>
                 </div>
 
                 <div className="text-console opacity-80 flex flex-col gap-0.5">
@@ -54,7 +54,7 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
 
               {/* Connector Arrow / Edge */}
               {index < data.nodes.length - 1 && (
-                <div className="flex items-center text-slate-500 font-mono">
+                <div className="flex items-center text-ink-muted font-mono">
                   <span className={outgoingEdge?.active ? 'text-status-healthy-fg animate-pulse' : ''}>
                     ──►
                   </span>
@@ -70,7 +70,7 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
         <div className="pt-4 border-t border-border-subtle flex justify-end">
           <button
             onClick={() => onExecuteMitigation('RETRY_FAILED_STEP')}
-            className="smart-launcher-button bg-status-critical-bg text-status-critical-fg border-status-critical-border hover:bg-red-900/50"
+            className="smart-launcher-button bg-status-critical-bg text-status-critical-fg border-status-critical-border hover:brightness-125"
           >
             ⚡ Trigger Automatic Retry / Bypass
           </button>

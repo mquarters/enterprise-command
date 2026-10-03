@@ -143,7 +143,7 @@ function Shell() {
     if (state && manifest) {
       const L3Component = manifest.L3Component;
       return (
-        <div className="min-h-screen bg-slate-950 text-white p-8 font-sans">
+        <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans">
           <button
             type="button"
             className="smart-launcher-button mb-6"
@@ -152,9 +152,9 @@ function Shell() {
             ← Back to Wall Display
           </button>
 
-          <header className="mb-6 border-b border-slate-800 pb-4">
+          <header className="mb-6 border-b border-border-subtle pb-4">
             <h1 className="text-desk-title font-bold">{state.header.title} — SRE Workbench</h1>
-            <p className="text-console text-slate-400 mt-1">
+            <p className="text-console text-ink-secondary mt-1">
               {state.header.ownerTeam} · ARCHETYPE: {state.l3Payload.archetype} · HEALTH:{' '}
               {state.header.healthState} · UPDATED:{' '}
               {new Date(state.header.updatedAt).toLocaleTimeString()}
@@ -183,11 +183,11 @@ function Shell() {
   const selectedState = view.mode === 'L2' ? states[view.processId] : undefined;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-8 font-sans">
-      <header className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-4">
+    <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans">
+      <header className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-border-subtle pb-4">
         <div>
           <h1 className="text-desk-title font-bold">VANTAGE // Command Center</h1>
-          <p className="text-console text-slate-400 mt-1">
+          <p className="text-console text-ink-secondary mt-1">
             L1 Wall Display · {pluginRegistry.getAll().length} registered processes ·
             mock telemetry feed
           </p>

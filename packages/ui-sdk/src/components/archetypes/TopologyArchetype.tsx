@@ -6,11 +6,11 @@ export const TopologyArchetype: React.FC<TopologyArchetypeProps> = ({
   data,
 }) => {
   return (
-    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-white">
+    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-ink-primary">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-desk-title font-bold">{data.clusterName}</h3>
-          <p className="text-console text-slate-400">Total Mesh Nodes: {data.totalNodes}</p>
+          <p className="text-console text-ink-secondary">Total Mesh Nodes: {data.totalNodes}</p>
         </div>
       </div>
 
@@ -32,16 +32,16 @@ export const TopologyArchetype: React.FC<TopologyArchetypeProps> = ({
               />
             </div>
 
-            <div className="space-y-1 text-[11px] font-mono text-slate-400">
+            <div className="space-y-1 text-console font-mono text-ink-secondary">
               <div className="flex justify-between">
                 <span>CPU:</span>
-                <span className={node.cpuUtilizationPct > 85 ? 'text-status-critical-fg' : 'text-slate-200'}>
+                <span className={node.cpuUtilizationPct > 85 ? 'text-status-critical-fg' : 'text-ink-primary'}>
                   {node.cpuUtilizationPct}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>MEM:</span>
-                <span className={node.memoryUtilizationPct > 85 ? 'text-status-warning-fg' : 'text-slate-200'}>
+                <span className={node.memoryUtilizationPct > 85 ? 'text-status-warning-fg' : 'text-ink-primary'}>
                   {node.memoryUtilizationPct}%
                 </span>
               </div>

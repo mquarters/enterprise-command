@@ -10,15 +10,15 @@ export const StatArchetype: React.FC<StatisticalArchetypeProps> = ({
   const minVal = Math.min(...data.timeSeries.map((d) => d.value), data.lowerControlLimit * 0.9);
 
   return (
-    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-white">
+    <div className="p-6 bg-surface-card border border-border-subtle rounded-xl text-ink-primary">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="text-desk-title font-bold">{data.metricName}</h3>
-          <p className="text-console text-slate-400">Statistical Process Control Chart ({processId})</p>
+          <p className="text-console text-ink-secondary">Statistical Process Control Chart ({processId})</p>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-mono font-bold">{data.currentValue}</span>
-          <span className="text-console text-slate-400 block">Current Reading</span>
+          <span className="text-desk-title font-mono font-bold">{data.currentValue}</span>
+          <span className="text-console text-ink-secondary block">Current Reading</span>
         </div>
       </div>
 
