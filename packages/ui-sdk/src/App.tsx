@@ -1,89 +1,128 @@
 /**
- * Core Platform UI Shell — Mock Data Test Run
+ * Core Platform UI Shell — recursive, scale-agnostic viewing model
  * -------------------------------------------------------------------------
  * Hosts the Plugin Registry, the mock WebSocket feed, and the Automated View
- * Controller:
- *   L1 — auto-renders the wall grid by iterating the plugin registry
- *   L2 — tile click opens the Triage Drawer overlay
- *   L3 — "Launch SRE Workbench" mounts the registered archetype component
+ * Controller. Shell state is a CONTEXT PATH (not a fixed tier union): an
+ * ordered trail of viewing frames, each naming one viewing TARGET (a process
+ * or one entity inside its envelope) and one viewing MODE ('detail' drawer or
+ * 'deep' canvas). "Back one scale" pops the last frame; crumb clicks truncate
+ * the trail; drills push a new frame. Chains terminate as DATA — an entity
+ * with no `deep` payload simply ends its chain at the detail view, and the
+ * runtime DEPTH_CAP guard refuses any push that would exceed depth 3.
  *
- * All telemetry comes from the mock state generator (no backend in this
- * test run). The Shell only DISPLAYS healthState; it never computes it.
+ * Principle 1: the Shell only DISPLAYS precomputed healthState, blast radius
+ * and narratives (all computed upstream by the mock generator). It never
+ * computes them, never branches on an archetype name, and never assumes a
+ * layout is bound to a scale. Deep views mount through pluginRegistry
+ * lookups (subEntityId manifest first, process DeepComponent fallback,
+ * visible canvas fallback last).
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  BaseArchetypeProps,
   ArchetypePayload,
+  DEPTH_CAP,
+  DetailExtract,
+  EnrichedEntity,
+  HealthState,
   ProcessStatePayload,
-  ProcessPluginManifest,
 } from './types';
-import { pluginRegistry, defineProcessPlugin } from './plugin-registry';
-import { ProcessTile } from './components/L1/ProcessTile';
-import { TriageDrawer } from './components/L2/TriageDrawer';
-import { FlowArchetype } from './components/archetypes/FlowArchetype';
-import { StatArchetype } from './components/archetypes/StatArchetype';
-import { TopologyArchetype } from './components/archetypes/TopologyArchetype';
-import { RuleGateArchetype } from './components/archetypes/RuleGateArchetype';
-import { HeatmapArchetype } from './components/archetypes/HeatmapArchetype';
+import { pluginRegistry } from './plugin-registry';
+import { ArchetypeCanvas } from './components/primitives/ArchetypeCanvas';
+import { DetailDrawer } from './components/primitives/DetailDrawer';
+import { OverviewTile } from './components/primitives/OverviewTile';
+import { SmartLauncherGroup } from './components/SmartLaunchers';
 import {
   mockProcessStates,
   createMockStateStream,
   MockStateStream,
 } from './mocks/processStateMocks';
+import { seedMockPlugins } from './mocks/pluginSeeds';
 
 // ============================================================================
-// Plugin Registry Seeding (mock "feature team" registrations)
+// Context-Path Model
 // ============================================================================
 
-const ARCHETYPE_COMPONENTS = {
-  FLOW: FlowArchetype,
-  STATISTICAL: StatArchetype,
-  TOPOLOGY: TopologyArchetype,
-  RULE_GATE: RuleGateArchetype,
-  HEATMAP: HeatmapArchetype,
-} as const;
+/** One viewing target: a process, or one entity inside its envelope. */
+type ViewTarget = { processId: string; entityId?: string };
 
-/** Registers one mock Process Plugin per seeded process state. */
-function seedMockPlugins(): void {
-  if (pluginRegistry.getAll().length > 0) return;
+/** Viewing MODE (not a data tier): detail drawer or deep canvas. */
+type ViewMode = 'detail' | 'deep';
 
-  for (const state of mockProcessStates) {
-    const archetype = state.deep.archetype;
-    const manifest: ProcessPluginManifest = {
-      processId: state.header.processId,
-      title: state.header.title,
-      ownerTeam: state.header.ownerTeam,
-      description: state.detail.narrativeSummary,
-      archetype,
-      // The registry stores manifests under the widened union props type;
-      // each concrete component narrows `data` again at mount time.
-      DeepComponent: ARCHETYPE_COMPONENTS[archetype] as React.ComponentType<
-        BaseArchetypeProps<ArchetypePayload>
-      >,
-    };
-    pluginRegistry.register(defineProcessPlugin(manifest));
-  }
-}
+/** One step on the context path: WHERE to look and in WHICH mode. */
+type ContextFrame = { target: ViewTarget; mode: ViewMode };
 
-seedMockPlugins(); // Shell boot: every mock plugin registers before first render
-
-// ============================================================================
-// Shell State
-// ============================================================================
-
-type ShellView =
-  | { mode: 'L1' }
-  | { mode: 'L2'; processId: string }
-  | { mode: 'L3'; processId: string };
+/** Everything a frame needs to paint — resolved by lookup, never derived. */
+type FocusedView = {
+  label: string;
+  kindHint: string;
+  health: HealthState;
+  extract: DetailExtract;
+  deep?: ArchetypePayload;
+};
 
 const TICK_INTERVAL_MS = 2500;
+
+const lastFrame = (trail: ContextFrame[]): ContextFrame | undefined =>
+  trail[trail.length - 1];
+
+const oneHopUp = (trail: ContextFrame[]): ContextFrame[] => trail.slice(0, -1);
+
+const hopToCrumb = (trail: ContextFrame[], index: number): ContextFrame[] =>
+  trail.slice(0, index + 1);
+
+const frameKey = (frame: ContextFrame): string =>
+  `${frame.target.processId}:${frame.target.entityId ?? ''}:${frame.mode}`;
+
+/** Resolve a frame's target through the envelope (display-only lookups). */
+function focusFrame(
+  frame: ContextFrame,
+  states: Record<string, ProcessStatePayload>
+): FocusedView | undefined {
+  const state = states[frame.target.processId];
+  if (!state) return undefined;
+  if (!frame.target.entityId) {
+    return {
+      label: state.header.title,
+      kindHint: `${state.header.ownerTeam} · ${state.header.processId}`,
+      health: state.header.healthState,
+      extract: state.detail,
+      deep: state.deep,
+    };
+  }
+  const entity = state.entities?.[frame.target.entityId];
+  if (!entity) return undefined;
+  return {
+    label: entity.label,
+    kindHint: `${entity.entityKind} · ${entity.entityId}`,
+    health: entity.healthState,
+    extract: entity.detail,
+    deep: entity.deep,
+  };
+}
+
+/** Sub-entities directly under a frame's target (data-driven drill hints). */
+function childrenOf(
+  frame: ContextFrame,
+  states: Record<string, ProcessStatePayload>
+): EnrichedEntity[] {
+  const state = states[frame.target.processId];
+  if (!state?.entities) return [];
+  const parentKey = frame.target.entityId ?? frame.target.processId;
+  return Object.values(state.entities).filter((entity) => entity.parentId === parentKey);
+}
+
+// ============================================================================
+// Shell
+// ============================================================================
+
+seedMockPlugins(); // Shell boot: every mock plugin registers before first render
 
 function Shell() {
   const [states, setStates] = useState<Record<string, ProcessStatePayload>>(() =>
     Object.fromEntries(mockProcessStates.map((s) => [s.header.processId, s]))
   );
-  const [view, setView] = useState<ShellView>({ mode: 'L1' });
+  const [trail, setTrail] = useState<ContextFrame[]>([]);
   const [streamLive, setStreamLive] = useState(true);
   const [lastTickAt, setLastTickAt] = useState<number>(() => Date.now());
   const [now, setNow] = useState<number>(() => Date.now());
@@ -137,52 +176,173 @@ function Shell() {
   const feedFresh = now - lastTickAt <= 10_000;
 
   // ------------------------------------------------------------------
-  // Tier L3 — dedicated full-page workbench
+  // Context-path navigation (all generic: no archetype-specific branching)
   // ------------------------------------------------------------------
-  if (view.mode === 'L3') {
-    const state = states[view.processId];
-    const manifest = pluginRegistry.get(view.processId);
-    if (state && manifest) {
-      const DeepView = manifest.DeepComponent;
-      return (
-        <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans">
+
+  const openProcess = (processId: string) =>
+    setTrail([{ target: { processId }, mode: 'detail' }]);
+
+  /** Same target, deeper mode: drawer → canvas for that target's payload. */
+  const goDeeper = () =>
+    setTrail((trail) =>
+      trail.map((frame, index) =>
+        index === trail.length - 1 ? { ...frame, mode: 'deep' } : frame
+      )
+    );
+
+  /**
+   * One hop DOWN the chain. Generic guards, no data derivation:
+   * - an affordance without entity data behind it does nothing;
+   * - a push at (or beyond) DEPTH_CAP is refused — the chain terminates.
+   */
+  const drillInto = (target: ViewTarget) => {
+    if (trail.length >= DEPTH_CAP) {
+      console.info(`[Shell] Depth cap (${DEPTH_CAP}) reached — deeper drill refused.`);
+      return;
+    }
+    const state = states[target.processId];
+    const entity = target.entityId ? state?.entities?.[target.entityId] : undefined;
+    if (!state || !entity) return; // no data behind this affordance → no view
+    if (entity.depth > DEPTH_CAP) {
+      console.info(`[Shell] "${entity.entityId}" sits at depth ${entity.depth} — beyond the cap.`);
+      return;
+    }
+    setTrail((trail) => [...trail, { target: target, mode: 'detail' }]);
+  };
+
+  /** One hop UP: close this frame, land on the previous target + mode. */
+  const goBack = () => setTrail(oneHopUp);
+
+  const goToCrumb = (index: number) => setTrail((trail) => hopToCrumb(trail, index));
+
+  const top = lastFrame(trail);
+  const current = top ? focusFrame(top, states) : undefined;
+  const parent = trail.length > 1 ? trail[trail.length - 2] : undefined;
+  const parentView = parent ? focusFrame(parent, states) : undefined;
+  const inDetailMode = Boolean(top && top.mode === 'detail' && current);
+  const inDeepMode = Boolean(top && top.mode === 'deep' && current?.deep);
+
+  // ------------------------------------------------------------------
+  // Reused regions
+  // ------------------------------------------------------------------
+
+  const grid = (
+    <main className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="wall-grid">
+      {pluginRegistry.getAll().map((manifest) => {
+        const state = states[manifest.processId];
+        if (!state) return null;
+        return (
+          <OverviewTile
+            key={manifest.processId}
+            density="wall"
+            entityKey={manifest.processId}
+            entityLabel={state.header.title}
+            subtitle={state.header.ownerTeam}
+            health={state.header.healthState}
+            heroLabel={state.overview.heroMetricLabel}
+            heroValue={state.overview.heroMetricValue}
+            heroUnit={state.overview.heroMetricUnit}
+            trend={state.overview.trend}
+            stale={isStale(state)}
+            onSelect={openProcess}
+          />
+        );
+      })}
+    </main>
+  );
+
+  const topChildren = top ? childrenOf(top, states) : [];
+
+  const childDrills = (
+    <section aria-label="Drill into sub-entities" data-testid="child-drills" className="mt-8">
+      <h3 className="text-console text-ink-secondary uppercase tracking-wider mb-3">
+        Sub-entity chains (depth {Math.min((top?.target.entityId ? 3 : 2), DEPTH_CAP)} ≤ cap {DEPTH_CAP})
+      </h3>
+      <div className="flex flex-wrap gap-3">
+        {topChildren.map((child) => (
+          <OverviewTile
+            key={child.entityId}
+            density="desk"
+            entityKey={child.entityId}
+            entityLabel={child.label}
+            subtitle={child.entityKind}
+            health={child.healthState}
+            heroLabel={child.detail.metrics?.[0]?.label}
+            heroValue={child.detail.metrics?.[0]?.value}
+            heroUnit={child.detail.metrics?.[0]?.unit}
+            onSelect={(entityId) => top && drillInto({ processId: top.target.processId, entityId })}
+          />
+        ))}
+      </div>
+    </section>
+  );
+
+  // ------------------------------------------------------------------
+  // Deep mode — full-page canvas for whichever entity is being viewed
+  // ------------------------------------------------------------------
+
+  if (top && inDeepMode && current) {
+    return (
+      <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans" data-testid="workbench-page">
+        <nav aria-label="Context path" className="flex flex-wrap items-center gap-3 mb-4">
           <button
             type="button"
-            className="smart-launcher-button mb-6"
-            onClick={() => setView({ mode: 'L1' })}
+            className="smart-launcher-button"
+            data-testid="back-one-scale"
+            onClick={goBack}
           >
-            ← Back to Wall Display
+            ← Back one scale
           </button>
+          {trail.map((frame, index) => {
+            const label = focusFrame(frame, states)?.label ?? frame.target.entityId ?? frame.target.processId;
+            return index === trail.length - 1 ? (
+              <span key={frameKey(frame)} className="text-console text-ink-secondary">
+                {index > 0 && <span className="mr-3 text-ink-muted">›</span>}
+                {label}
+              </span>
+            ) : (
+              <button
+                key={frameKey(frame)}
+                type="button"
+                className="smart-launcher-button"
+                onClick={() => goToCrumb(index)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
 
-          <header className="mb-6 border-b border-border-subtle pb-4">
-            <h1 className="text-desk-title font-bold">{state.header.title} — SRE Workbench</h1>
-            <p className="text-console text-ink-secondary mt-1">
-              {state.header.ownerTeam} · ARCHETYPE: {state.deep.archetype} · HEALTH:{' '}
-              {state.header.healthState} · UPDATED:{' '}
-              {new Date(state.header.updatedAt).toLocaleTimeString()}
-            </p>
-          </header>
+        <header className="mb-6 border-b border-border-subtle pb-4">
+          <h1 className="text-desk-title font-bold">{current.label} — SRE Workbench</h1>
+          <p className="text-console text-ink-secondary mt-1">
+            {current.kindHint} · HEALTH: {current.health} · UPDATED:{' '}
+            {new Date(states[top.target.processId].header.updatedAt).toLocaleTimeString()}
+          </p>
+        </header>
 
-          <main className="max-w-6xl">
-            <DeepView
-              processId={state.header.processId}
-              data={state.deep}
-              health={state.header.healthState}
-              onExecuteMitigation={async (actionKey, payload) => {
-                console.info('[Shell] Mitigation dispatched', actionKey, payload);
-                window.alert(`Mitigation dispatched: ${actionKey}`);
-              }}
-            />
-          </main>
-        </div>
-      );
-    }
+        <main className="max-w-6xl">
+          <ArchetypeCanvas
+            processId={top.target.processId}
+            entityId={top.target.entityId}
+            entityLabel={current.label}
+            data={current.deep!}
+            health={current.health}
+            registry={pluginRegistry}
+            onExecuteMitigation={async (actionKey, payload) => {
+              console.info('[Shell] Mitigation dispatched', actionKey, payload);
+              window.alert(`Mitigation dispatched: ${actionKey}`);
+            }}
+          />
+          {topChildren.length > 0 && childDrills}
+        </main>
+      </div>
+    );
   }
 
   // ------------------------------------------------------------------
-  // Tier L1 — wall display grid (auto-rendered from the Plugin Registry)
+  // Detail mode (and the default wall view) — grid backdrop + drawer
   // ------------------------------------------------------------------
-  const selectedState = view.mode === 'L2' ? states[view.processId] : undefined;
 
   return (
     <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans">
@@ -190,8 +350,7 @@ function Shell() {
         <div>
           <h1 className="text-desk-title font-bold">VANTAGE // Command Center</h1>
           <p className="text-console text-ink-secondary mt-1">
-            L1 Wall Display · {pluginRegistry.getAll().length} registered processes ·
-            mock telemetry feed
+            {pluginRegistry.getAll().length} registered processes · mock telemetry feed
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -211,33 +370,52 @@ function Shell() {
         </div>
       </header>
 
-      <main className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {pluginRegistry.getAll().map((manifest) => {
-          const state = states[manifest.processId];
-          if (!state) return null;
-          return (
-            <ProcessTile
-              key={manifest.processId}
-              processId={manifest.processId}
-              title={state.header.title}
-              ownerTeam={state.header.ownerTeam}
-              health={state.header.healthState}
-              summary={state.overview}
-              stale={isStale(state)}
-              onSelect={(processId) => setView({ mode: 'L2', processId })}
-            />
-          );
-        })}
-      </main>
+      {!top && grid}
 
-      {/* Tier L2 — triage drawer overlay (opens on tile click) */}
-      {view.mode === 'L2' && selectedState && (
-        <TriageDrawer
-          key={selectedState.header.processId}
-          payload={selectedState}
-          onClose={() => setView({ mode: 'L1' })}
-          onLaunchWorkbench={(processId) => setView({ mode: 'L3', processId })}
-        />
+      {inDetailMode && top && current && (
+        <>
+          {/* Backdrop behind the drawer — same page shape at every scale */}
+          {trail.length === 1 ? (
+            grid
+          ) : (
+            parent &&
+            parentView?.deep && (
+              <main
+                className="max-w-6xl pointer-events-none select-none opacity-40"
+                aria-hidden="true"
+              >
+                <ArchetypeCanvas
+                  processId={parent.target.processId}
+                  entityId={parent.target.entityId}
+                  entityLabel={parentView.label}
+                  data={parentView.deep}
+                  health={parentView.health}
+                  registry={pluginRegistry}
+                />
+              </main>
+            )
+          )}
+
+          <DetailDrawer
+            key={frameKey(top)}
+            level={top.target.entityId ? 'entity' : 'process'}
+            entityLabel={current.label}
+            kindHint={current.kindHint}
+            extract={current.extract}
+            health={current.health}
+            hasDeepView={Boolean(current.deep)}
+            onOpenDeep={goDeeper}
+            onBack={goBack}
+            launcherSlot={
+              !top.target.entityId && states[top.target.processId].smartLaunchers?.length
+                ? <SmartLauncherGroup
+                    launchers={states[top.target.processId].smartLaunchers!}
+                    payload={states[top.target.processId]}
+                  />
+                : undefined
+            }
+          />
+        </>
       )}
     </div>
   );
