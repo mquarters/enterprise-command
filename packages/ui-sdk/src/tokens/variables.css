@@ -1,0 +1,83 @@
+/**
+ * Command Center Design System Tokens - Version 1.0.0
+ * Dark-Mode First Palette & Distance-Based Typography
+ */
+
+:root {
+  /* ==========================================================================
+     1. ANTI-GLARE SURFACE PALETTE (OLED / TV Wall Tuned)
+     ========================================================================== */
+  --surface-base: #0b0f17;       /* Primary canvas background */
+  --surface-card: #121824;       /* L1 Tile & L3 Canvas surface */
+  --surface-overlay: #1e293b;    /* L2 Drawer & Modal surface */
+  --surface-elevated: #334155;   /* Hover / Active elevated state */
+  --border-subtle: #1e293b;      /* Default card borders */
+  --border-strong: #475569;      /* Focused element borders */
+
+  /* ==========================================================================
+     2. SEMANTIC STATUS TOKENS (High Contrast & TV Wall Glows)
+     ========================================================================== */
+  /* Critical / Outage State */
+  --status-critical-fg: #f87171;
+  --status-critical-bg: rgba(127, 29, 29, 0.4);
+  --status-critical-border: #ef4444;
+  --status-critical-glow: rgba(239, 68, 68, 0.6);
+
+  /* Warning / Degradation State */
+  --status-warning-fg: #fbbf24;
+  --status-warning-bg: rgba(120, 53, 15, 0.4);
+  --status-warning-border: #f59e0b;
+  --status-warning-glow: rgba(245, 158, 11, 0.5);
+
+  /* Healthy / Nominal State */
+  --status-healthy-fg: #4ade80;
+  --status-healthy-bg: rgba(20, 83, 45, 0.3);
+  --status-healthy-border: #22c55e;
+  --status-healthy-glow: rgba(34, 197, 94, 0.3);
+
+  /* Unknown / Stale State */
+  --status-unknown-fg: #94a3b8;
+  --status-unknown-bg: rgba(30, 41, 59, 0.5);
+  --status-unknown-border: #64748b;
+  --status-unknown-glow: rgba(100, 116, 139, 0.2);
+
+  /* ==========================================================================
+     3. DISTANCE-BASED TYPOGRAPHY SCALE
+     ========================================================================== */
+  /* Tier L1: NOC TV Wall Scale (Viewed from 15–30 ft) */
+  --font-size-tv-hero: 4.5rem;    /* 72px - Hero Metric Values */
+  --font-size-tv-title: 2.25rem;  /* 36px - Tile Titles */
+  --font-size-tv-sub: 1.5rem;     /* 24px - Metric Labels */
+
+  /* Tier L2 & L3: Desktop / SRE Workbench Scale */
+  --font-size-desk-title: 1.25rem;/* 20px - Drawer Headers */
+  --font-size-desk-body: 0.875rem;/* 14px - Narrative Summaries */
+  --font-size-console: 0.75rem;   /* 12px - Monospace Logs & Telemetry */
+
+  /* Font Families */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ==========================================================================
+   4. ANIMATION KEYFRAMES (Pulsing Alerts & Active Connectors)
+   ========================================================================== */
+@keyframes critical-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px var(--status-critical-glow);
+    border-color: var(--status-critical-border);
+  }
+  50% {
+    box-shadow: 0 0 35px var(--status-critical-glow), inset 0 0 15px rgba(239, 68, 68, 0.3);
+    border-color: #fca5a5;
+  }
+}
+
+@keyframes flow-line-active {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-critical-pulse {
+  animation: critical-pulse 2s infinite ease-in-out;
+}
