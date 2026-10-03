@@ -13,8 +13,8 @@ import { ComponentType } from 'react';
 /** Health state evaluated upstream by backend engine */
 export type HealthState = 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
 
-/** The four standardized L3 visual layouts */
-export type ArchetypeType = 'FLOW' | 'STATISTICAL' | 'TOPOLOGY' | 'RULE_GATE';
+/** The five standardized L3 visual layouts */
+export type ArchetypeType = 'FLOW' | 'STATISTICAL' | 'TOPOLOGY' | 'RULE_GATE' | 'HEATMAP';
 
 /** Trend direction for L1 hero metrics */
 export type TrendDirection = 'UP' | 'DOWN' | 'STABLE' | 'NEUTRAL';
@@ -123,12 +123,30 @@ export interface RuleGateArchetypePayload {
   }>;
 }
 
+/** Archetype 5: Service × Time Error-Rate Heatmap Data */
+export interface HeatmapArchetypePayload {
+  archetype: 'HEATMAP';
+  metricName: string;
+  columns: number; // time buckets per row (oldest → newest)
+  bucketMinutes: number; // width of one time bucket, in minutes
+  serviceRows: Array<{
+    serviceId: string;
+    label: string;
+    cells: Array<{
+      bucket: number;
+      errorRate: number; // error-rate % for that bucket
+      status: HealthState;
+    }>;
+  }>;
+}
+
 /** Discriminated Union for all L3 Domain Data Payloads */
 export type L3DomainPayload =
   | FlowArchetypePayload
   | StatisticalArchetypePayload
   | TopologyArchetypePayload
-  | RuleGateArchetypePayload;
+  | RuleGateArchetypePayload
+  | HeatmapArchetypePayload;
 
 /** The Canonical State Envelope received over WebSockets / API */
 export interface ProcessStatePayload {
@@ -154,6 +172,7 @@ export type FlowArchetypeProps = BaseArchetypeProps<FlowArchetypePayload>;
 export type StatisticalArchetypeProps = BaseArchetypeProps<StatisticalArchetypePayload>;
 export type TopologyArchetypeProps = BaseArchetypeProps<TopologyArchetypePayload>;
 export type RuleGateArchetypeProps = BaseArchetypeProps<RuleGateArchetypePayload>;
+export type HeatmapArchetypeProps = BaseArchetypeProps<HeatmapArchetypePayload>;
 
 // ============================================================================
 // 5. PLUGIN REGISTRATION CONTRACT

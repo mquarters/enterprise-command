@@ -24,6 +24,7 @@ export { FlowArchetype } from './components/archetypes/FlowArchetype';
 export { StatArchetype } from './components/archetypes/StatArchetype';
 export { TopologyArchetype } from './components/archetypes/TopologyArchetype';
 export { RuleGateArchetype } from './components/archetypes/RuleGateArchetype';
+export { HeatmapArchetype } from './components/archetypes/HeatmapArchetype';
 
 // Mock data engine (test-run transport stand-in)
 export {

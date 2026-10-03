@@ -25,6 +25,7 @@ import { FlowArchetype } from './components/archetypes/FlowArchetype';
 import { StatArchetype } from './components/archetypes/StatArchetype';
 import { TopologyArchetype } from './components/archetypes/TopologyArchetype';
 import { RuleGateArchetype } from './components/archetypes/RuleGateArchetype';
+import { HeatmapArchetype } from './components/archetypes/HeatmapArchetype';
 import {
   mockProcessStates,
   createMockStateStream,
@@ -40,6 +41,7 @@ const ARCHETYPE_COMPONENTS = {
   STATISTICAL: StatArchetype,
   TOPOLOGY: TopologyArchetype,
   RULE_GATE: RuleGateArchetype,
+  HEATMAP: HeatmapArchetype,
 } as const;
 
 /** Registers one mock Process Plugin per seeded process state. */

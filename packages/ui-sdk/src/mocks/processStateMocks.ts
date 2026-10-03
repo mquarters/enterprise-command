@@ -59,6 +59,15 @@ function deriveHealthState(payload: L3DomainPayload): HealthState {
       return rollupHealth(payload.nodes.map((n) => n.status));
     case 'RULE_GATE':
       return payload.rules.some((r) => !r.passed) ? 'CRITICAL' : 'HEALTHY';
+    case 'HEATMAP': {
+      const cells = payload.serviceRows.flatMap((row) => row.cells);
+      const critical = cells.filter((c) => c.status === 'CRITICAL').length;
+      if (critical >= 2) return 'CRITICAL';
+      if (critical === 1 || cells.some((c) => c.status === 'WARNING' || c.status === 'UNKNOWN')) {
+        return 'WARNING';
+      }
+      return 'HEALTHY';
+    }
   }
 }
 
@@ -156,7 +165,41 @@ function driftL3Payload(payload: L3DomainPayload): L3DomainPayload {
       });
       return { ...payload, rules };
     }
+
+    case 'HEATMAP': {
+      const serviceRows = payload.serviceRows.map((row) => ({
+        ...row,
+        cells: row.cells.map((cell) => {
+          const errorRate = jitter(cell.errorRate, 0.3, 0, 100);
+          const status: HealthState =
+            errorRate > 4 ? 'CRITICAL' : errorRate > 1.5 ? 'WARNING' : 'HEALTHY';
+          return { ...cell, errorRate, status };
+        }),
+      }));
+      return { ...payload, serviceRows };
+    }
   }
+}
+
+/** Builds one heatmap row; status per bucket is computed upstream, never in the UI. */
+function heatRow(
+  serviceId: string,
+  label: string,
+  rates: number[]
+): {
+  serviceId: string;
+  label: string;
+  cells: Array<{ bucket: number; errorRate: number; status: HealthState }>;
+} {
+  return {
+    serviceId,
+    label,
+    cells: rates.map((errorRate, bucket) => ({
+      bucket,
+      errorRate,
+      status: errorRate > 4 ? 'CRITICAL' : errorRate > 1.5 ? 'WARNING' : 'HEALTHY',
+    })),
+  };
 }
 
 // ============================================================================
@@ -196,9 +239,9 @@ export function nextMockState(previous: ProcessStatePayload): ProcessStatePayloa
   };
 }
 
-// ============================================================================
-// Seed data — six processes across the four L3 archetypes
-// ============================================================================
+/**
+ * Seed data — seven processes across the five L3 archetypes
+ */
 
 export const mockProcessStates: ProcessStatePayload[] = [
   {
@@ -498,6 +541,57 @@ export const mockProcessStates: ProcessStatePayload[] = [
         label: 'Regulatory Report Vault',
         targetTool: 'CUSTOM',
         url: 'https://regrep.internal/reports/liquidity',
+      },
+    ],
+  },
+  {
+    header: {
+      processId: 'proc-fx-quote-mesh-07',
+      title: 'FX Quote Broadcast Mesh',
+      ownerTeam: 'Payments Reliability',
+      updatedAt: new Date().toISOString(),
+      healthState: 'WARNING',
+      staleHeartbeatThresholdSeconds: 10,
+    },
+    l1Summary: {
+      heroMetricLabel: 'Peak Error Rate',
+      heroMetricValue: 3.9,
+      heroMetricUnit: '%',
+      trend: 'UP',
+    },
+    l2Detail: {
+      narrativeSummary:
+        'FX quote staleness above SLA on OTC Quote Gateway and FX Matching Engine; matching engine may throttle on stale feeds.',
+      impactedCount: 240,
+      impactedUnit: 'quotes',
+      primaryFailureKey: 'FAIL_FX_QUOTE_STALE_SLA',
+      incidentStartedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    l3Payload: {
+      archetype: 'HEATMAP',
+      metricName: 'Error rate % per service per 5-min bucket',
+      columns: 12,
+      bucketMinutes: 5,
+      serviceRows: [
+        heatRow('svc-otc-quotes', 'OTC Quote Gateway', [1.1, 0.9, 1.4, 0.7, 1.2, 0.8, 1.6, 1.3, 1.1, 0.9, 1.5, 1.8]),
+        heatRow('svc-fx-matcher', 'FX Matching Engine', [2.1, 2.4, 1.9, 2.8, 3.1, 2.6, 3.4, 3.9, 3.6, 3.1, 2.8, 3.4]),
+        heatRow('svc-nostro-recon', 'Nostro Reconciliation', [0.2, 0.1, 0.3, 0.2, 0.1, 0.2, 0.3, 0.1, 0.2, 0.4, 0.2, 0.3]),
+        heatRow('svc-ems-ingress', 'EMS Order Ingress', [0.4, 0.6, 0.3, 0.5, 0.4, 0.2, 0.5, 0.3, 0.4, 0.6, 0.3, 0.4]),
+      ],
+    },
+    smartLaunchers: [
+      {
+        id: 'sl-1',
+        label: 'FX Quote Heatmap',
+        targetTool: 'GRAFANA',
+        url: 'https://grafana.internal/d/fx/quote-heatmap',
+        parameters: { window: '60m' },
+      },
+      {
+        id: 'sl-2',
+        label: 'Matching Engine Traces',
+        targetTool: 'JAEGER',
+        url: 'https://jaeger.internal/trace/fx-matcher',
       },
     ],
   },
