@@ -1,40 +1,31 @@
 # Consolidated System Blueprint: Domain-Driven Command Center Platform
 
-```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                           1. ENRICHED DATA PIPELINE                               │
-│     Evaluates business logic, health rules, and blast radius in the DB layer      │
-└─────────────────────────────────────────┬─────────────────────────────────────────┘
-                                          │
-                        WebSocket / SSE Stream (Polymorphic Payload)
-                                          │
-                                          ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                         2. CORE PLATFORM UI SHELL                                 │
-│         Hosts Plugin Registry, Global State Router, and Smart Launcher Engine     │
-└─────────────────────────────────────────┬─────────────────────────────────────────┘
-                                          │
-      ┌───────────────────────────────────┼───────────────────────────────────┐
-      │ Auto-renders array                │ Auto-renders container            │ Mounts on demand
-      ▼                                   ▼                                   ▼
-┌───────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
-│ 3. TIER L1 VIEW           │   │ 4. TIER L2 VIEW           │   │ 5. TIER L3 VIEW           │
-│ (NOC Wall Display Grid)   │   │ (Triage Drawer Container) │   │ (SRE Workbench Workspace) │
-│ ┌───────────────────────┐ │   │ ┌───────────────────────┐ │   │ ┌───────────────────────┐ │
-│ │ L1 Micro Components   │ │   │ │ L2 Micro Components   │ │   │ │ L3 Archetype Shells   │ │
-│ │  - L1ProcessCard      │ │   │ │  - L2NarrativeBanner  │ │   │ │  - Flow Canvas        │ │
-│ │  - HeroValue          │ │   │ │  - L2BlastRadiusBadge │ │   │ │  - ControlLimitChart  │ │
-│ │  - PulseAlertHalo     │ │   │ │  - SmartLauncherGroup │ │   │ │  - ClusterNodeGrid    │ │
-│ └───────────────────────┘ │   │ └───────────────────────┘ │   │ └───────────────────────┘ │
-└───────────────────────────┘   └───────────────────────────┘   └───────────────────────────┘
+## 0. The model in one paragraph
+
+The platform has no "tiers." It has three **viewing MODES** — overview, detail, deep —
+and every mode applies to **any entity at any scale**. An 80-inch wall tile and a
+depth-3 sub-entity chip differ in *density and geometry*, not in kind. The Shell is a
+**path-based context stack**: its state is an ordered trail of viewing frames
+`{ processId, entityId?, mode }`. Drills push frames onto the trail; "back one scale"
+pops one frame; crumb clicks truncate. Chains recurse downward until the data
+terminates or the cap `DEPTH_CAP = 3` is reached (named in `src/types.ts`,
+runtime-enforced by generic guards in the Shell). All health states, blast radii,
+narratives and per-metric statuses are computed **upstream** (the mock generator now,
+the real engine later); the UI **displays** them — it never derives them (Principle 1).
 
 ```
-
----
+  Overview mode ── <OverviewTile />   wall density (tiles) · desk density (drill chips)
+  Detail mode   ── <DetailDrawer />   any entity's DetailExtract, inside <DrawerShell />
+  Deep mode     ── <ArchetypeCanvas /> mounts any entity's deep payload via registry lookup
+```
 
 ## 1. The Enriched Data Pipeline (Data Engine)
 
-The backend pipeline processes business rules, threshold evaluations, and impact metrics before emitting data. Instead of raw telemetry, it streams a single **Polymorphic State Envelope** (`ProcessStatePayload`) over WebSockets to power all view levels simultaneously.
+The backend pipeline processes business rules, threshold evaluations and impact
+metrics *before* emitting anything. One **ProcessStatePayload** envelope per process
+travels over the transport (test run: the mock generator in
+`packages/ui-sdk/src/mocks/processStateMocks.ts`, which stands in for WebSocket/SSE)
+and powers every viewing mode at every scale simultaneously.
 
 ### Canonical Data Contract
 
@@ -42,281 +33,171 @@ The backend pipeline processes business rules, threshold evaluations, and impact
 +-----------------------------------------------------------------------------------+
 | PROCESS STATE ENVELOPE (ProcessStatePayload)                                      |
 +-----------------------------------------------------------------------------------+
-| HEADER        : processId, title, ownerTeam, updatedAt, healthState               |
-| L1 EXTRACT    : heroMetricLabel, heroMetricValue, trendDirection                  |
-| L2 EXTRACT    : narrativeSummary, impactedCount, impactedUnit, primaryFailureKey  |
-| L3 DOMAIN DATA: archetype ('FLOW'|'STATISTICAL'|'TOPOLOGY'|'RULE_GATE'),          |
-|                  l3Payload                                                        |
+| HEADER   : processId, title, ownerTeam, updatedAt, healthState,                   |
+|            staleHeartbeatThresholdSeconds (heartbeat-gap / staleness input)      |
+| OVERVIEW : OverviewExtract — heroMetricLabel/Value/Unit, trend                   |
+| DETAIL   : DetailExtract — narrativeSummary, impactedCount, impactedUnit,        |
+|            primaryFailureKey, incidentStartedAt, metrics[]                       |
+| DEEP     : ArchetypePayload — one of five canvas layouts (see §4)                |
+| ENTITIES : Record<entityId, EnrichedEntity> — the sub-entity chains              |
+| LAUNCHERS: SmartLauncherContext[] — deep-link DATA, rendered by SmartLaunchers   |
 +-----------------------------------------------------------------------------------+
-
 ```
 
-* **Health Engine Rule:** `healthState` (`HEALTHY`, `WARNING`, `CRITICAL`, `UNKNOWN`) is computed upstream to prevent UI client re-calculation lag.
-
----
-
-## 2. Core Platform UI Shell & Plugin Architecture
-
-The **Platform Shell** acts as the parent host environment. Feature teams build isolated **Process Plugins** using a unified SDK, which register their L3 visual views and metadata with the Shell.
+Every `EnrichedEntity` carries its own chain:
 
 ```
-                           ┌─────────────────────────┐
-                           │      PROCESS PLUGIN     │
-                           ├─────────────────────────┤
-                           │ - Metadata & Identity   │
-                           │ - Archetype Selector    │
-                           │ - Custom L3 Component   │
-                           └────────────┬────────────┘
-                                        │
-                                        ▼ (Registers via `@platform/ui-sdk`)
+EnrichedEntity { entityId, parentId, entityKind, depth, healthState, detail, deep? }
+```
+
+- Keys inside `entities` are entityIds; `parentId` points at the owning process
+  (depth 2) or at a parent entity's entityId (depth 3).
+- `detail` (its drawer content) always exists; `deep` (its own custom canvas payload)
+  is optional — **chains continue or terminate as DATA, never as code**.
+- `entityKind` is a display hint only. The Shell and the primitives never branch
+  on it.
+- `MetricReading.status` and each entity's `healthState` are computed upstream.
+
+**Health Engine Rule (Principle 1):** `healthState` (`HEALTHY | WARNING | CRITICAL |
+UNKNOWN`) and every per-metric status are evaluated upstream to prevent UI-client
+re-calculation lag. UI components map those values to token classes; they never
+evaluate thresholds or derive health themselves.
+
+## 2. Core Platform Shell & Plugin Registry (ID-keyed, not name-keyed)
+
+The Platform Shell hosts the Plugin Registry, the mock feed, and the Automated View
+Controller. Feature teams build isolated Process Plugins (`defineProcessPlugin`) and
+register them with the Shell; in the test run, `src/mocks/pluginSeeds.ts` seeds
+equivalent mock manifests from the mock states.
+
+```
+                     ┌──────────────────────────────────────────────┐
+                     │ PROCESS PLUGIN (ProcessPluginManifest)       │
+                     │  title/ownerTeam/archetype + DeepComponent   │
+                     │  subEntities?: Record<subEntityId,           │
+                     │      SubEntityManifest {detailView?,deepView?}│
+                     └──────────────────┬───────────────────────────┘
+                                        │ registered by processId
+                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ CORE PLATFORM UI SHELL                                                           │
+│ CORE PLATFORM UI SHELL (src/App.tsx — the preview harness mounts it via main.tsx)│
 │                                                                                  │
-│ ┌──────────────────────────────────┐  ┌────────────────────────────────────────┐ │
-│ │ PLUGIN REGISTRY                  │  │ WEBSOCKET DATA MANAGER                 │ │
-│ │ (Map of registered process keys) │  │ (Ingests DB stream & validates schema) │ │
-│ └─────────────────┬────────────────┘  └───────────────────┬────────────────────┘ │
-│                   │                                       │                      │
-│                   └───────────────────┬───────────────────┘                      │
-│                                       ▼                                          │
-│ ┌──────────────────────────────────────────────────────────────────────────────┐ │
-│ │ AUTOMATED VIEW CONTROLLER                                                    │ │
-│ │  - L1 View: Iterates registry to render array of <L1ProcessCard /> items.    │ │
-│ │  - L2 View: Opens <L2TriageDrawerContainer /> on tile click.                 │ │
-│ │  - L3 View: Mounts registered L3 Archetype layout on workbench request.      │ │
-│ └──────────────────────────────────────────────────────────────────────────────┘ │
+│  Plugin Registry (src/plugin-registry.ts)                                         │
+│    get(processId) ───────────────► process DeepComponent fallback                │
+│    getSubEntity(processId, entityId) ─► SubEntityManifest (optional overrides)   │
+│                                                                                  │
+│  Automated View Controller — context-path navigation, all generic:                │
+│    push (drill into a sub-entity) · pop ("back one scale", Esc, ✕)               │
+│    · truncate (crumb click) · mode swap (detail ⇄ deep for the SAME target)      │
+│                                                                                  │
+│  Deep-canvas resolution chain (ArchetypeCanvas):                                  │
+│    getSubEntity(pid, entityId)?.deepView                                          │
+│      → get(processId).DeepComponent          (shared layout fallback)            │
+│      → VISIBLE "no canvas registered" fallback (never a blank canvas)            │
+│                                                                                  │
+│  Layout resolution is a DATA LOOKUP keyed by id —                                │
+│  ARCHETYPE_COMPONENTS[payload.archetype] (mocks/pluginSeeds.ts) and the          │
+│  registry chain above. There is no per-archetype `if` and no archetype-name     │
+│  literal anywhere in the Shell or shared code.                                   │
 └──────────────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ### The Smart Link Context Injector
 
-When an operator transitions out of the platform into third-party observability tools, the Shell dynamic link generator passes structured state:
+When an operator transitions out of the platform into third-party observability
+tools, `SmartLauncherGroup` + `buildLauncherUrl` (`src/components/SmartLaunchers.tsx`)
+inject time-window bounds (`from`/`to`) and filtered tags (`process_id`,
+`failure_key`, launcher parameters) into the launcher DATA. Launchers arrive as
+payload data (`smartLaunchers`); the Shell merely composes the slot into
+`DetailDrawer.launcherSlot`.
 
-* Time window bounds (`from`, `to`).
-* Filtered tags (`process_id`, `cluster_id`, `trace_id`).
-
----
-
-## 3. View Containers vs. Micro-Component Primitives
-
-The system strictly divides **View Containers** (the layouts and grids) from **Micro Components** (the reusable UI building blocks).
+### Context-path trail — what the Shell state looks like
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ TIER L1 VIEW (NOC Wall Display Grid)                                              │
-│ ┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐        │
-│ │ L1ProcessCard        │ │ L1ProcessCard        │ │ L1ProcessCard        │ ...    │
-│ │ (Billing Ingestion)  │ │ (Auth Pipeline)      │ │ (Kafka Cluster)      │        │
-│ └──────────────────────┘ └──────────────────────┘ └──────────────────────┘        │
-└─────────────────────────────────────────┬─────────────────────────────────────────┘
-                                          │ Click Tile
-                                          ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ TIER L2 VIEW (Triage Drawer Overlay)                                              │
-│ ┌───────────────────────────────────────────────────────────────────────────────┐ │
-│ │ L2NarrativeBanner  │  L2BlastRadiusBadge  │  SmartLauncherGroup               │ │
-│ └───────────────────────────────────────┬───────────────────────────────────────┘ │
-└─────────────────────────────────────────┼─────────────────────────────────────────┘
-                                          │ Click "Launch SRE Workbench"
-                                          ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ TIER L3 VIEW (SRE Workbench Page)                                                 │
-│ ┌───────────────────────────────────────────────────────────────────────────────┐ │
-│ │ L3 Archetype Container (Flow Canvas / Control Chart / Mesh Grid)              │ │
-│ │ Populated by Micro-Primitives: FlowNodes, Metric Gauges, Stage Trackers       │ │
-│ └───────────────────────────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────────────┘
-
+trail = []                                        → wall grid (overview mode, every process)
+trail = [{P, detail}]                             → process DetailDrawer over the grid
+trail = [{P, deep}]                               → process workbench (deep mode of the PROCESS)
+trail = [{P, deep}, {n1, detail}]                 → Ingest Batch drawer OVER the process canvas
+trail = [{P, deep}, {n1, deep}]                   → Ingest Batch's OWN mini-FLOW canvas
+trail = [{P, deep}, {n1, deep}, {c3, detail}]     → Queue Writer depth-3 detail — at the cap,
+                                                    the chain terminates (c3 has no `deep`)
 ```
 
-### Tier Structural Breakdown
+- Esc / ✕ / "back one scale" pops exactly one frame — one hop up per press.
+- The depth cap is enforced generically at the drill affordance: a push whose target
+  sits beyond depth 3 is refused (trail-length guard + `entity.depth` guard). Because
+  seeded chains terminate as data at the cap, the guard is defense-in-depth for
+  future data, not a per-case special case.
+- Depth is a CEILING, not a guarantee: most chains stop at depth 2 (detail-only
+  extracts); only Ingest Batch recurses to depth 3.
 
-| Tier Level | Container View (The Canvas) | Contained Component Primitives (The Elements) | Visual & Operational Rules |
+## 3. Three Viewing Modes ≠ Data Tiers
+
+| Mode | Primitive | Densities & geometry | Display-only rule (Principle 1) |
 | --- | --- | --- | --- |
-| **Tier L1** | **`L1WallDisplayView`**<br>*(CSS grid auto-scaling across 80-inch displays)* | **`L1ProcessCard`**<br>Contains: `<HeroMetricDisplay/>`, `<StatusIndicatorGlow/>`, `<TrendArrow/>`. | Dark background (`#0B0F17`), zero buttons, massive typography readable from 20 feet, pulsing alert halos. |
-| **Tier L2** | **`L2TriageDrawerContainer`**<br>*(Slide-out drawer overlaying the dashboard)* | **`L2NarrativeBanner`**<br><br>**`L2BlastRadiusBadge`**<br><br>**`SmartLauncherButton`** | Plain-English incident summaries, count of impacted users/transactions, deep-link triggers. |
-| **Tier L3** | **`L3WorkbenchView`**<br>*(Dedicated full-page workspace)* | **Archetype-Specific Primitives:**<br><br>• Flow: `<FlowNode/>`, `<StageConnector/>`<br><br>• Stats: `<ControlLimitChart/>`, `<SigmaLine/>`<br><br>• Topology: `<ClusterNodeGrid/>`, `<PressureGauge/>` | Maximum data density, high-density monospace telemetry, deep forensics, manual override triggers. |
+| **Overview** | `OverviewTile` | `density="wall"`: process-scale wall tile (distance type, grid cell) · `density="desk"`: compact sub-entity drill chip | Maps the precomputed `health` prop to `--status-*` token classes; shows the hero reading verbatim. Derives no color, no verdict, no trend semantics. |
+| **Detail** | `DetailDrawer` (framed by `DrawerShell`) | process scale: 480px wide, `--z-drawer` · sub-entity scale: 340px wide, `--z-detail-drawer` | Renders ANY entity's `DetailExtract` verbatim — narrative, blast radius, per-metric statuses all arrive precomputed. |
+| **Deep** | `ArchetypeCanvas` | full-page canvas, identical mount path whether the payload belongs to a process or to a depth-2/3 entity | Resolves WHICH canvas paints via registry lookup by id; never validates or re-evaluates the payload. |
 
----
+- At most **one DrawerShell is mounted at a time**, and it owns the ONE global Esc
+  keydown handler and the ONE focus manager (Tab cycles inside the panel; focus is
+  restored to the opener on close). The old stack of two Esc handlers is gone.
+- Drawer geometry comes from tokens, not hard-coded numbers:
+  `--z-drawer`/`--z-detail-drawer` (900/1000) and `--drawer-width-process` /
+  `--drawer-width-entity` (480px/340px), each with a matching Tailwind class mapping.
+- A detail drawer floats above a backdrop (the grid, or the parent canvas rendered
+  `aria-hidden` + `pointer-events-none`); the backdrop is contextual depth cue, never
+  a second interactive surface.
 
-## 4. The 4 L3 Visual Archetypes
+## 4. The Five Canvas Layouts, at Any Scale
 
-Every custom process view maps to one of four standardized visual layouts inside the Tier L3 View container.
+Five standardized layouts — `FLOW`, `STATISTICAL`, `TOPOLOGY`, `RULE_GATE`,
+`HEATMAP` — are **layouts, not tiers**. A layout is never bound to a scale:
 
-```
-+-----------------------------------------------------------------------------------+
-| ARCHETYPE 1: Pipeline / Flow (Sequential Stages, DAGs, Batch Processing)          |
-| [ Ingest ] ───> [ Validate ] ───> [ Transform (FAILED) ] ───> [ Deliver ]         |
-+-----------------------------------------------------------------------------------+
-| ARCHETYPE 2: Threshold & Statistical Matrix (Quality Standards, Variance)         |
-| [ Upper Control Limit ] ─────────────────────────                                 |
-| [ Mean Reading        ] ───*──────*───*──────────                                 |
-| [ Lower Control Limit ] ─────────────────────────                                 |
-+-----------------------------------------------------------------------------------+
-| ARCHETYPE 3: Topology & Mesh Grid (Clusters, Brokers, Infrastructure Nodes)       |
-| Cluster East: [ Node 01: OK ] [ Node 02: OOM ] [ Node 03: OK ]                    |
-+-----------------------------------------------------------------------------------+
-| ARCHETYPE 4: Rule Engine & Policy Gate (Compliance, Business Rule Verification)   |
-| Rule: "Liquidity Ratio >= 15%" ───> State: VIOLATED (Current: 11.2%)              |
-+-----------------------------------------------------------------------------------+
-
-```
-
-1. **Pipeline / Flow:** Visualizes sequential dependencies, execution stages, and blocked pipelines using node-and-edge graphs.
-2. **Threshold & Statistical Matrix:** Visualizes data variance, process quality limits (X-bar/R-charts), and sigma boundaries over time.
-3. **Topology & Mesh Grid:** Visualizes spatial distributions, server/node clusters, queue brokers, and resource contention.
-4. **Rule Engine & Policy Gate:** Visualizes boolean policy checks, SLA rules, and compliance gate states.
-
----
+- Payment Clearing's process workbench and Ingest Batch's internals are BOTH FLOW
+  canvases — one FlowArchetype paints both, chosen by lookup, not by `if`.
+- A sub-entity whose `deep` is absent simply ends its chain at the detail drawer.
+- A payload whose layout has no registered component paints the VISIBLE canvas
+  fallback (a registered blind spot is a bug, so it must be loud).
 
 ## 5. Technology Layer Division
 
-The implementation stack keeps logic strict while standardizing presentation tokens across all tiers.
-
 ```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ LOGICAL ENGINE (TypeScript)                                                       │
-│  - Enforces backend data interfaces (`ProcessStatePayload`)                       │
-│  - Validates API and WebSocket payloads at runtime via Zod                        │
-│  - Type-checks plugin registrations via `@platform/ui-sdk`                        │
-└────────────────────────────────────────┬──────────────────────────────────────────┘
-                                         │
-                                         ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ VISUAL STYLING ENGINE (Tailwind CSS + CSS Variables)                              │
-│  - Distance Typography Tokens (`text-tv-hero`, `text-tv-title` vs `text-console`) │
-│  - High-Contrast Status Tokens (`bg-status-critical`, `animate-pulse-glow`)       │
-│  - Anti-Glare Dark Mode Surface Palette (`#0B0F17`, `#121824`, `#1E293B`)         │
-└───────────────────────────────────────────────────────────────────────────────────┘
+LOGICAL ENGINE (TypeScript)
+  src/types.ts ............ contracts + DEPTH_CAP = 3 (EnrichedEntity, DetailExtract,
+                            MetricReading.status, ArchetypePayload, SubEntityManifest)
+  src/plugin-registry.ts .. id-keyed registry (get / getSubEntity / getAll / has)
+  src/mocks/ .............. mock backend = the "upstream": processStateMocks.ts
+                            computes all health/detail/blast data; pluginSeeds.ts
+                            seeds the registry from that data (test-run stand-in for
+                            real feature-team bundles)
 
-```
-
-Here is a system prompt and context specification designed to bootstrap a local LLM (e.g., via Ollama, LM Studio, or vLLM). It frames the background, objectives, and technical constraints so the local model can function as an effective coding assistant for building this platform.
-
----
-
-# System Prompt for Local LLM Development Assistant
-
-```markdown
-# SYSTEM PROMPT: DOMAIN-DRIVEN COMMAND CENTER PLATFORM DEVELOPER
-
-You are an expert Principal Software Architect and Full-Stack Engineer specializing in high-density Observability Platforms, NOC Command Centers, and SRE Workbenches. 
-
-You are helping build a **Domain-Driven Command Center Platform**. Your task is to assist in developing the frontend UI SDK, backend API schema, real-time WebSocket ingestion layer, and plugin architecture based on the specifications provided below.
-
----
-
-## 1. PROJECT BACKGROUND & CORE INTENT
-
-### The Problem
-Traditional enterprise dashboards fail in high-stakes monitoring environments (NOCs, Command Centers) because developers build disconnected, inconsistent UI views using raw generic components (Material UI, Tailwind, etc.). When a failure occurs, operators face cognitive overload, mismatched terminology, and poor visibility on large wall displays.
-
-### The Solution
-We are building a **Unified Command Center Architecture** that separates **View Containers** from **Micro Components** and uses a **3-Tier Progressive Disclosure Model** across **4 Standardized Visual Archetypes**. 
-
-The system operates on an **Enriched Data Pipeline** where the backend processes health, rules, and blast radius *before* sending a single polymorphic JSON state envelope to the UI.
-
----
-
-## 2. ARCHITECTURAL CORE PRINCIPLES
-
-1. **Upstream State Engine:** Never compute status logic, thresholds, or health colors in the frontend UI. The backend database/pipeline emits `healthState` (`HEALTHY`, `WARNING`, `CRITICAL`, `UNKNOWN`).
-2. **Container Views vs. Micro Primitives:** 
-   - **Views** are full-page layout canvases (L1 Wall Grid, L2 Drawer Overlay, L3 Workbench Page).
-   - **Components** are atomic, domain-driven building blocks that sit inside those views (`<L1ProcessCard/>`, `<L2NarrativeBanner/>`, `<FlowNode/>`).
-3. **Strict Plugin SDK:** Feature teams do not build custom dashboards from scratch. They write a **Process Plugin** using our `@platform/ui-sdk`, which maps their backend telemetry to one of the 4 supported L3 Visual Archetypes.
-4. **Dark-Mode & Distance First:** All UI tokens must support high-contrast, anti-glare dark mode (`#0B0F17`) and dual-scale typography (massive text for 80-inch TV walls viewed from 20 ft away vs. dense monospace text for SRE desktop consoles).
-
----
-
-## 3. THE 3 TIER SYSTEM SPECIFICATION
-
-| Tier Level | Container View | Contained Micro-Components | Operational Intent |
-| :--- | :--- | :--- | :--- |
-| **Tier L1** | **`L1WallDisplayView`**<br>(Responsive CSS grid for 80-inch NOC TV displays) | **`L1ProcessCard`**<br>Contains: Hero Metric, Trend Arrow, Status Glow Halo. | **Passive Glanceability.** Read from 15–30 feet. Zero buttons, zero small text. Instant answer to "Is it working?" |
-| **Tier L2** | **`L2TriageDrawerContainer`**<br>(Slide-out drawer overlay on desktop) | **`L2NarrativeBanner`**<br>**`L2BlastRadiusBadge`**<br>**`SmartLauncherGroup`** | **Rapid First-Level Triage.** Opened on L1 tile click. Explains the issue in plain English and quantifies impacted users/transactions. |
-| **Tier L3** | **`L3WorkbenchView`**<br>(Full-screen dedicated SRE workspace page) | **Archetype Primitives:**<br>Nodes, Edges, Control Limit Lines, Cluster Grids, Policy Rule Cards. | **Deep Forensics & Control.** High-density interactive visual model for root-cause analysis and operational remediation. |
-
----
-
-## 4. THE 4 L3 VISUAL ARCHETYPES
-
-Every process registered in the platform must select exactly one of these 4 archetypes for its Tier L3 View:
-
-1. **Pipeline / Flow (`FLOW`):** Directed acyclic graphs (DAGs), sequential processing steps, batch execution pipelines.
-2. **Statistical / Threshold (`STATISTICAL`):** Control charts, upper/lower control limits, mean variance, X-bar/R metrics.
-3. **Topology / Mesh (`TOPOLOGY`):** Infrastructure grids, cluster nodes, queue brokers, spatial node maps.
-4. **Rule Engine / Gate (`RULE_GATE`):** Boolean policy logic, SLA compliance checks, dynamic rule evaluations.
-
----
-
-## 5. TECHNICAL STACK & CONTRACTS
-
-* **Logical Engine:** TypeScript (`.ts` / `.tsx`) enforcing data contracts and runtime Zod validation.
-* **Styling Engine:** Tailwind CSS + CSS Variables (`variables.css`) defining custom surface glare tokens (`bg-slate-950`), status colors, and TV font utilities (`text-tv-hero`, `text-tv-title`).
-* **Data Transport:** Real-time WebSocket / SSE streaming `ProcessStatePayload` envelopes.
-
-### Canonical Data Contract Schema Reference
-```typescript
-type HealthState = 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
-type ArchetypeType = 'FLOW' | 'STATISTICAL' | 'TOPOLOGY' | 'RULE_GATE';
-
-interface ProcessStatePayload {
-  // Metadata Header
-  processId: string;
-  title: string;
-  ownerTeam: string;
-  updatedAt: string;
-  healthState: HealthState;
-
-  // L1 TV Extract
-  l1Summary: {
-    heroMetricLabel: string;
-    heroMetricValue: string | number;
-    trendDirection: 'UP' | 'DOWN' | 'FLAT';
-  };
-
-  // L2 Triage Extract
-  l2Detail: {
-    narrativeSummary: string;
-    impactedCount: number;
-    impactedUnit: string;
-    primaryFailureKey: string | null;
-  };
-
-  // L3 Domain Payload
-  l3Domain: {
-    archetype: ArchetypeType;
-    payload: Record<string, unknown>; // Specific to chosen archetype
-  };
-}
-
+STYLING ENGINE (Tailwind CSS + CSS Variables)
+  src/tokens/variables.css .......... raw values live ONCE here (colors, --scrim,
+                                      --z-drawer, --z-detail-drawer, --drawer-width-*,
+                                      --shadow-drawer, tv-*/desk-*/console type scales)
+  src/tokens/tailwind.config.js ..... maps every token to a class (z-drawer/z-detail,
+                                      w-drawer-*, shadow-drawer, text-tv-*, status colors)
+                                      — unmapped = dead class, not allowed
+  packages/ui-sdk/tailwind.config.js  dev-harness re-export of the token config
+  src/tokens/domain-component.css ... component classes (.l1-process-card, .flow-node
+                                      [data-status], .detail-narrative, launcher button)
+  packages/ui-sdk/vite.config.mts ... dev harness Vite config (react dedupe)
 ```
 
----
+- Zero raw palette colors in primitives or Shell — status colors travel through
+  `var(--status-*)` templates or `bg-/text-/border-status-*` token classes.
+- Dual-scale typography (wall distance type vs dense console monospace) is a
+  *density* concern, handled by token choices inside the same primitives.
 
-## 6. DEVELOPMENT GOALS & IMMEDIATE TASKS
+## 6. Glossary
 
-As my local development assistant, your initial goals are to help me step-by-step:
-
-1. **SDK Core (`@platform/ui-sdk`):** Define the TypeScript type definitions, runtime validation schemas (Zod), and the `defineProcessPlugin` registration factory.
-2. **Design Tokens & Styling:** Write the production `variables.css` and `tailwind.config.js` containing anti-glare colors, TV-scale typography, and status glow keyframes.
-3. **Component Primitives:** Implement atomic React components for Tier L1 (`<L1ProcessCard/>`), Tier L2 (`<L2TriageDrawerContainer/>`), and the 4 Tier L3 Archetype Shells.
-4. **Mock State Generator:** Build a mock WebSocket stream generator that emits compliant `ProcessStatePayload` JSON to test real-time re-renders, network disconnection overrides, and stale data heartbeats.
-
----
-
-When responding, adhere strictly to these architectural guidelines. Keep TypeScript types strict, ensure Tailwind classes match distance-based design requirements, and maintain the clean separation between Container Views and Micro Components.
-
----
-
-
-```
-### How to use this prompt:
-1. Paste the block above into your local LLM interface (Ollama system prompt, LM Studio system message, or vLLM initialization).
-2. Start development by giving it specific prompt commands like:
-   * *"Task 1: Generate the full TypeScript definitions and Zod schemas for `@platform/ui-sdk`."*
-   * *"Task 2: Build the `<L1ProcessCard/>` React component using Tailwind CSS according to the L1 specification."*
-
-```
+- **Viewing mode** — overview · detail · deep; available for ANY target at ANY depth.
+- **Viewing target** — the entity under focus (a process, or a depth-2/3 entity).
+- **Context path (trail)** — the Shell's navigation state: the ordered stack of
+  (target, mode) frames.
+- **Chain** — one entity's drill path; continues while data continues (each
+  EnrichedEntity's optional `deep`), always capped at depth 3.
+- **Principle 1** — compute upstream, display downstream. Per primitive this means:
+  OverviewTile only maps a status to a token; DetailDrawer only displays an extract;
+  ArchetypeCanvas only looks up which layout paints.
