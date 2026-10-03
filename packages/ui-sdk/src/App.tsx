@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BaseArchetypeProps,
-  L3DomainPayload,
+  ArchetypePayload,
   ProcessStatePayload,
   ProcessPluginManifest,
 } from './types';
@@ -49,17 +49,17 @@ function seedMockPlugins(): void {
   if (pluginRegistry.getAll().length > 0) return;
 
   for (const state of mockProcessStates) {
-    const archetype = state.l3Payload.archetype;
+    const archetype = state.deep.archetype;
     const manifest: ProcessPluginManifest = {
       processId: state.header.processId,
       title: state.header.title,
       ownerTeam: state.header.ownerTeam,
-      description: state.l2Detail.narrativeSummary,
+      description: state.detail.narrativeSummary,
       archetype,
       // The registry stores manifests under the widened union props type;
       // each concrete component narrows `data` again at mount time.
-      L3Component: ARCHETYPE_COMPONENTS[archetype] as React.ComponentType<
-        BaseArchetypeProps<L3DomainPayload>
+      DeepComponent: ARCHETYPE_COMPONENTS[archetype] as React.ComponentType<
+        BaseArchetypeProps<ArchetypePayload>
       >,
     };
     pluginRegistry.register(defineProcessPlugin(manifest));
@@ -143,7 +143,7 @@ function Shell() {
     const state = states[view.processId];
     const manifest = pluginRegistry.get(view.processId);
     if (state && manifest) {
-      const L3Component = manifest.L3Component;
+      const DeepView = manifest.DeepComponent;
       return (
         <div className="min-h-screen bg-surface-base text-ink-primary p-8 font-sans">
           <button
@@ -157,16 +157,16 @@ function Shell() {
           <header className="mb-6 border-b border-border-subtle pb-4">
             <h1 className="text-desk-title font-bold">{state.header.title} — SRE Workbench</h1>
             <p className="text-console text-ink-secondary mt-1">
-              {state.header.ownerTeam} · ARCHETYPE: {state.l3Payload.archetype} · HEALTH:{' '}
+              {state.header.ownerTeam} · ARCHETYPE: {state.deep.archetype} · HEALTH:{' '}
               {state.header.healthState} · UPDATED:{' '}
               {new Date(state.header.updatedAt).toLocaleTimeString()}
             </p>
           </header>
 
           <main className="max-w-6xl">
-            <L3Component
+            <DeepView
               processId={state.header.processId}
-              data={state.l3Payload}
+              data={state.deep}
               health={state.header.healthState}
               onExecuteMitigation={async (actionKey, payload) => {
                 console.info('[Shell] Mitigation dispatched', actionKey, payload);
@@ -222,7 +222,7 @@ function Shell() {
               title={state.header.title}
               ownerTeam={state.header.ownerTeam}
               health={state.header.healthState}
-              summary={state.l1Summary}
+              summary={state.overview}
               stale={isStale(state)}
               onSelect={(processId) => setView({ mode: 'L2', processId })}
             />

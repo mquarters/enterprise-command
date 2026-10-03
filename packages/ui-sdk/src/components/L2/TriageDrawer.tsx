@@ -35,8 +35,8 @@ export function buildLauncherUrl(
       url.searchParams.set('to', to.toISOString());
     }
     url.searchParams.set('process_id', payload.header.processId);
-    if (payload.l2Detail.primaryFailureKey) {
-      url.searchParams.set('failure_key', payload.l2Detail.primaryFailureKey);
+    if (payload.detail.primaryFailureKey) {
+      url.searchParams.set('failure_key', payload.detail.primaryFailureKey);
     }
     Object.entries(launcher.parameters ?? {}).forEach(([key, value]) =>
       url.searchParams.set(key, String(value))
@@ -137,7 +137,7 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const { header, l2Detail } = payload;
+  const { header, detail } = payload;
   const health = header.healthState;
 
   return (
@@ -189,14 +189,14 @@ export const TriageDrawer: React.FC<TriageDrawerProps> = ({
 
         <L2NarrativeBanner
           health={health}
-          narrative={l2Detail.narrativeSummary}
-          failureKey={l2Detail.primaryFailureKey}
+          narrative={detail.narrativeSummary}
+          failureKey={detail.primaryFailureKey}
         />
 
         <L2BlastRadiusBadge
           health={health}
-          impactedCount={l2Detail.impactedCount}
-          impactedUnit={l2Detail.impactedUnit}
+          impactedCount={detail.impactedCount}
+          impactedUnit={detail.impactedUnit}
         />
 
         {/* Deep links */}

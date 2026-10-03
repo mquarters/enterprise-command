@@ -12,7 +12,7 @@
 
 import {
   HealthState,
-  L3DomainPayload,
+  ArchetypePayload,
   ProcessStatePayload,
   TrendDirection,
 } from '../types';
@@ -44,7 +44,7 @@ function rollupHealth(statuses: HealthState[]): HealthState {
 }
 
 /** Upstream health engine: derives process health from drifted domain data. */
-function deriveHealthState(payload: L3DomainPayload): HealthState {
+function deriveHealthState(payload: ArchetypePayload): HealthState {
   switch (payload.archetype) {
     case 'FLOW':
       return rollupHealth(payload.nodes.map((n) => n.status));
@@ -102,7 +102,7 @@ function driftImpactedCount(health: HealthState, count: number): number {
 // Archetype payload drift (fresh objects only)
 // ============================================================================
 
-function driftL3Payload(payload: L3DomainPayload): L3DomainPayload {
+function driftDeepPayload(payload: ArchetypePayload): ArchetypePayload {
   switch (payload.archetype) {
     case 'FLOW': {
       const nodes = payload.nodes.map((node) => ({
@@ -208,11 +208,11 @@ function heatRow(
 
 /** Produces a fresh, drifted copy of an envelope. Never mutates the input. */
 export function nextMockState(previous: ProcessStatePayload): ProcessStatePayload {
-  const l3Payload = driftL3Payload(previous.l3Payload);
-  const healthState = deriveHealthState(l3Payload);
+  const deep = driftDeepPayload(previous.deep);
+  const healthState = deriveHealthState(deep);
   const healthChanged = healthState !== previous.header.healthState;
 
-  const previousHero = previous.l1Summary.heroMetricValue;
+  const previousHero = previous.overview.heroMetricValue;
   const heroMetricValue =
     typeof previousHero === 'number'
       ? jitter(previousHero, 0.15, 0, Number.MAX_SAFE_INTEGER)
@@ -220,21 +220,21 @@ export function nextMockState(previous: ProcessStatePayload): ProcessStatePayloa
   const trend: TrendDirection =
     typeof previousHero === 'number' && typeof heroMetricValue === 'number'
       ? trendFor(previousHero, heroMetricValue)
-      : previous.l1Summary.trend;
+      : previous.overview.trend;
 
-  const impactedCount = driftImpactedCount(healthState, previous.l2Detail.impactedCount);
+  const impactedCount = driftImpactedCount(healthState, previous.detail.impactedCount);
 
   return {
     header: { ...previous.header, healthState, updatedAt: new Date().toISOString() },
-    l1Summary: { ...previous.l1Summary, heroMetricValue, trend },
-    l2Detail: {
-      ...previous.l2Detail,
+    overview: { ...previous.overview, heroMetricValue, trend },
+    detail: {
+      ...previous.detail,
       impactedCount,
       narrativeSummary: healthChanged
         ? narrativeFor(previous.header.title, healthState)
-        : previous.l2Detail.narrativeSummary,
+        : previous.detail.narrativeSummary,
     },
-    l3Payload,
+    deep,
     smartLaunchers: previous.smartLaunchers,
   };
 }
@@ -253,13 +253,13 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'CRITICAL',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Processing Latency',
       heroMetricValue: 1420,
       heroMetricUnit: 'ms',
       trend: 'UP',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary:
         'Settlement queue depth exceeded capacity due to high latency in the FedWire validation step.',
       impactedCount: 14250,
@@ -267,7 +267,7 @@ export const mockProcessStates: ProcessStatePayload[] = [
       primaryFailureKey: 'ERR_FEDWIRE_TIMEOUT_504',
       incidentStartedAt: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
     },
-    l3Payload: {
+    deep: {
       archetype: 'FLOW',
       nodes: [
         { id: 'n1', label: 'Ingest Batch', status: 'HEALTHY', durationMs: 45 },
@@ -304,18 +304,18 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'HEALTHY',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Token Issuance Rate',
       heroMetricValue: 98.4,
       heroMetricUnit: '%',
       trend: 'STABLE',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary: 'Auth Pipeline (OAuth): operating within normal parameters.',
       impactedCount: 0,
       impactedUnit: 'sessions',
     },
-    l3Payload: {
+    deep: {
       archetype: 'FLOW',
       nodes: [
         { id: 'n1', label: 'Token Mint', status: 'HEALTHY', durationMs: 8 },
@@ -351,13 +351,13 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'WARNING',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Cluster CPU',
       heroMetricValue: 88,
       heroMetricUnit: '%',
       trend: 'UP',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary:
         'Two brokers in the US-East mesh are above 85% utilization; partition rebalance is in progress.',
       impactedCount: 312000000,
@@ -365,7 +365,7 @@ export const mockProcessStates: ProcessStatePayload[] = [
       primaryFailureKey: 'WARN_BROKER_PRESSURE_EAST',
       incidentStartedAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
     },
-    l3Payload: {
+    deep: {
       archetype: 'TOPOLOGY',
       clusterName: 'US-East Production Mesh',
       totalNodes: 6,
@@ -404,13 +404,13 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'CRITICAL',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Rules Violated',
       heroMetricValue: 2,
       heroMetricUnit: 'of 3',
       trend: 'UP',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary:
         'TLS 1.2 downgrade detected on the scrubbing lane and tokenization rotation is overdue.',
       impactedCount: 8400,
@@ -418,7 +418,7 @@ export const mockProcessStates: ProcessStatePayload[] = [
       primaryFailureKey: 'FAIL_TLS_VERSION_CHECK',
       incidentStartedAt: new Date(Date.now() - 96 * 60 * 1000).toISOString(),
     },
-    l3Payload: {
+    deep: {
       archetype: 'RULE_GATE',
       policyId: 'POL-COMPLIANCE-01',
       policyName: 'PCI-DSS Data Scrubbing Gate',
@@ -452,18 +452,18 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'HEALTHY',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Auth Latency',
       heroMetricValue: 118,
       heroMetricUnit: 'ms',
       trend: 'DOWN',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary: 'Card Auth Latency: operating within normal parameters.',
       impactedCount: 0,
       impactedUnit: 'authorizations',
     },
-    l3Payload: {
+    deep: {
       archetype: 'STATISTICAL',
       metricName: 'Card Authorization Latency (ms)',
       currentValue: 118,
@@ -505,13 +505,13 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'CRITICAL',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Liquidity Ratio',
       heroMetricValue: 11.2,
       heroMetricUnit: '%',
       trend: 'DOWN',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary:
         'Liquidity ratio fell below the 15% regulatory floor; reserve coverage remains compliant.',
       impactedCount: 2,
@@ -519,7 +519,7 @@ export const mockProcessStates: ProcessStatePayload[] = [
       primaryFailureKey: 'FAIL_LIQUIDITY_RATIO_FLOOR',
       incidentStartedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     },
-    l3Payload: {
+    deep: {
       archetype: 'RULE_GATE',
       policyId: 'POL-TREASURY-07',
       policyName: 'Basel III Liquidity Policy Gate',
@@ -553,13 +553,13 @@ export const mockProcessStates: ProcessStatePayload[] = [
       healthState: 'WARNING',
       staleHeartbeatThresholdSeconds: 10,
     },
-    l1Summary: {
+    overview: {
       heroMetricLabel: 'Peak Error Rate',
       heroMetricValue: 3.9,
       heroMetricUnit: '%',
       trend: 'UP',
     },
-    l2Detail: {
+    detail: {
       narrativeSummary:
         'FX quote staleness above SLA on OTC Quote Gateway and FX Matching Engine; matching engine may throttle on stale feeds.',
       impactedCount: 240,
@@ -567,7 +567,7 @@ export const mockProcessStates: ProcessStatePayload[] = [
       primaryFailureKey: 'FAIL_FX_QUOTE_STALE_SLA',
       incidentStartedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     },
-    l3Payload: {
+    deep: {
       archetype: 'HEATMAP',
       metricName: 'Error rate % per service per 5-min bucket',
       columns: 12,

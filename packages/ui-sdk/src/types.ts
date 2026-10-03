@@ -1,53 +1,69 @@
 /**
  * @package `@platform/ui-sdk`
  * @file src/types.ts
- * Core contracts, state envelopes, and archetype props for Command Center plugins.
+ * Core contracts: entity-chain envelopes, scale-agnostic view models, and
+ * archetype props for Command Center plugins.
+ *
+ * MODEL (v2 — recursive, scale-agnostic)
+ * --------------------------------------
+ * A viewing MODE is one of: overview (tile/chip) · detail (drawer) · deep
+ * (canvas). A viewing TARGET is an entity at some scale: depth 1 = process,
+ * depth 2 = sub-entity, depth 3 = sub-sub-entity (cap: DEPTH_CAP). The same
+ * three primitives serve every scale; nothing here is bound to a tier.
+ * Components consume enriched view models computed upstream and never derive
+ * health, blast radius, or narrative themselves (Principle 1).
  */
 
 import { ComponentType } from 'react';
 
 // ============================================================================
-// 1. CORE ENUMS & PRIMITIVE TYPES
+// 1. CORE ENUMS & CONSTANTS
 // ============================================================================
 
 /** Health state evaluated upstream by backend engine */
 export type HealthState = 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
 
-/** The five standardized L3 visual layouts */
+/** The five standardized deep-view layouts (these are layouts, not tiers) */
 export type ArchetypeType = 'FLOW' | 'STATISTICAL' | 'TOPOLOGY' | 'RULE_GATE' | 'HEATMAP';
 
-/** Trend direction for L1 hero metrics */
+/** Trend direction for overview-tier hero metrics */
 export type TrendDirection = 'UP' | 'DOWN' | 'STABLE' | 'NEUTRAL';
 
-// ============================================================================
-// 2. POLYMORPHIC STATE ENVELOPE (Data Pipeline -> UI Shell)
-// ============================================================================
+/**
+ * Maximum entity-chain depth (1 = process … 3 = sub-sub-entity).
+ * The Shell blocks drill attempts beyond DEPTH_CAP; chains may terminate
+ * earlier — depth is a ceiling, not a guarantee.
+ */
+export const DEPTH_CAP = 3;
 
-/** Base metadata present on every process state update */
-export interface ProcessStateHeader {
-  processId: string;
-  title: string;
-  ownerTeam: string;
-  updatedAt: string; // ISO-8601 string or epoch ms
-  healthState: HealthState;
-  staleHeartbeatThresholdSeconds?: number;
+/** One quantified reading displayed by a detail view (e.g. queue depth). */
+export interface MetricReading {
+  label: string;
+  value: string | number;
+  unit?: string;
 }
 
-/** Data extracted strictly for Tier L1 Wall Display Tiles */
-export interface L1SummaryExtract {
+// ============================================================================
+// 2. SCALE-AGNOSTIC VIEW MODELS (any depth, any entity kind)
+// ============================================================================
+
+/** Overview-tier extract — what an OverviewTile/chip paints at ANY scale. */
+export interface OverviewExtract {
   heroMetricLabel: string;
   heroMetricValue: string | number;
   heroMetricUnit?: string;
   trend: TrendDirection;
 }
 
-/** Context extracted strictly for Tier L2 Triage Drawers */
-export interface L2DetailExtract {
+/** Detail-tier extract — what a DetailDrawer renders at ANY scale. */
+export interface DetailExtract {
   narrativeSummary: string; // Plain-English incident description
   impactedCount: number; // Quantitative blast radius
   impactedUnit: string; // e.g., "accounts", "transactions", "nodes"
   primaryFailureKey?: string; // Failure code or classification
   incidentStartedAt?: string;
+  /** Entity-scoped readings (queue depth, oldest-message age, …). */
+  metrics?: MetricReading[];
 }
 
 /** Deep links generated for third-party external tools */
@@ -60,7 +76,7 @@ export interface SmartLauncherContext {
 }
 
 // ============================================================================
-// 3. ARCHETYPE-SPECIFIC L3 PAYLOADS
+// 3. ARCHETYPE-SPECIFIC DEEP PAYLOADS (layouts usable at ANY scale)
 // ============================================================================
 
 /** Archetype 1: Pipeline / Sequential Flow Data */
@@ -140,31 +156,71 @@ export interface HeatmapArchetypePayload {
   }>;
 }
 
-/** Discriminated Union for all L3 Domain Data Payloads */
-export type L3DomainPayload =
+/** Discriminated union for every deep-view payload, at any entity scale */
+export type ArchetypePayload =
   | FlowArchetypePayload
   | StatisticalArchetypePayload
   | TopologyArchetypePayload
   | RuleGateArchetypePayload
   | HeatmapArchetypePayload;
 
-/** The Canonical State Envelope received over WebSockets / API */
+// ============================================================================
+// 4. ENTITY CHAINS & THE CANONICAL ENVELOPE
+// ============================================================================
+
+/** Base metadata present on every process state update */
+export interface ProcessStateHeader {
+  processId: string;
+  title: string;
+  ownerTeam: string;
+  updatedAt: string; // ISO-8061 string or epoch ms
+  healthState: HealthState;
+  staleHeartbeatThresholdSeconds?: number;
+}
+
+/**
+ * A drillable entity nested inside a process envelope. Carries its own chain:
+ * `detail` (its drawer content) and optionally `deep` (its own custom deep
+ * view) — so chains continue or terminate as DATA, not code. Keys inside
+ * ProcessStatePayload.entities are entityIds; parentId points at the owning
+ * process (depth 2) or at another entity's entityId (depth 3).
+ */
+export interface EnrichedEntity {
+  entityId: string; // unique within its process envelope (== the entities[] key)
+  parentId: string; // processId at depth 2; parent entityId at depth 3
+  entityKind: string; // display hint only (FLOW_NODE, CLUSTER_NODE, RULE, HEATMAP_ROW, …) — the Shell never branches on it
+  label: string;
+  depth: number; // 1..DEPTH_CAP
+  healthState: HealthState;
+  detail: DetailExtract; // what its DetailDrawer renders
+  deep?: ArchetypePayload; // optional custom deep view for this entity
+}
+
+/** The canonical state envelope received over WebSockets / API (per process) */
 export interface ProcessStatePayload {
   header: ProcessStateHeader;
-  l1Summary: L1SummaryExtract;
-  l2Detail: L2DetailExtract;
-  l3Payload: L3DomainPayload;
+  /** Process-scale overview extract (wall tile) */
+  overview: OverviewExtract;
+  /** Process-scale detail extract (triage drawer) */
+  detail: DetailExtract;
+  /** Process-scale deep payload (workbench canvas) */
+  deep: ArchetypePayload;
+  /** Sub-entity chains keyed by entityId — data for drills into sub-entities */
+  entities?: Record<string, EnrichedEntity>;
   smartLaunchers?: SmartLauncherContext[];
 }
 
 // ============================================================================
-// 4. ARCHETYPE COMPONENT PROPS (Tier L3 View Primitives)
+// 5. ARCHETYPE COMPONENT PROPS (deep-view primitives)
 // ============================================================================
 
-export interface BaseArchetypeProps<T extends L3DomainPayload = L3DomainPayload> {
+export interface BaseArchetypeProps<T extends ArchetypePayload = ArchetypePayload> {
   processId: string;
+  /** The deep payload of the entity being viewed, whatever its scale */
   data: T;
   health: HealthState;
+  /** Drill affordance: called with a clicked sub-entity's entityId; omit to hide drills */
+  onSelectEntity?: (entityId: string) => void;
   onExecuteMitigation?: (actionKey: string, payload?: unknown) => Promise<void>;
 }
 
@@ -175,28 +231,56 @@ export type RuleGateArchetypeProps = BaseArchetypeProps<RuleGateArchetypePayload
 export type HeatmapArchetypeProps = BaseArchetypeProps<HeatmapArchetypePayload>;
 
 // ============================================================================
-// 5. PLUGIN REGISTRATION CONTRACT
+// 6. PLUGIN REGISTRATION CONTRACT
 // ============================================================================
 
+/**
+ * Presentation knowledge for ONE sub-entity, declared per subEntityId.
+ * Both slots are optional: a sub-entity with neither gets the generic
+ * DetailDrawer (from its EnrichedEntity.detail); one with `deepView` +
+ * a `deep` payload in data gets its own custom canvas.
+ */
+export interface SubEntityManifest {
+  /** Replaces the generic DetailDrawer for this entity (rare; default exists) */
+  detailView?: ComponentType<{ entity: EnrichedEntity }>;
+  /** Custom canvas mounted when this entity's `deep` payload is present */
+  deepView?: ComponentType<BaseArchetypeProps>;
+}
+
 /** Configuration object required when registering a process plugin */
-export interface ProcessPluginManifest<T extends L3DomainPayload = L3DomainPayload> {
+export interface ProcessPluginManifest<T extends ArchetypePayload = ArchetypePayload> {
   processId: string;
   title: string;
   ownerTeam: string;
   description: string;
   archetype: ArchetypeType;
-  
-  /** Component mounted when operator opens Tier L3 Workbench */
-  L3Component: ComponentType<BaseArchetypeProps<T>>;
-  
+
+  /** Deep view for the process itself (archetype-selected deep payload) */
+  DeepComponent: ComponentType<BaseArchetypeProps<T>>;
+
   /** Optional custom fallback component for payload validation errors */
   ErrorFallbackComponent?: ComponentType<{ error: Error; processId: string }>;
+
+  /** Sub-entity presentation knowledge, keyed by subEntityId */
+  subEntities?: Record<string, SubEntityManifest>;
 }
 
 /** Registry interface maintained by the Core Platform Shell */
 export interface PluginRegistry {
-  register<T extends L3DomainPayload>(manifest: ProcessPluginManifest<T>): void;
+  register<T extends ArchetypePayload>(manifest: ProcessPluginManifest<T>): void;
   get(processId: string): ProcessPluginManifest | undefined;
+  getSubEntity(processId: string, entityId: string): SubEntityManifest | undefined;
   getAll(): ProcessPluginManifest[];
   has(processId: string): boolean;
 }
+
+// ============================================================================
+// 7. DEPRECATED ALIASES (name history, not architecture — do not extend)
+// ============================================================================
+
+/** @deprecated Renamed to ArchetypePayload: layouts are scale-agnostic */
+export type L3DomainPayload = ArchetypePayload;
+/** @deprecated Renamed to OverviewExtract */
+export type L1SummaryExtract = OverviewExtract;
+/** @deprecated Renamed to DetailExtract */
+export type L2DetailExtract = DetailExtract;

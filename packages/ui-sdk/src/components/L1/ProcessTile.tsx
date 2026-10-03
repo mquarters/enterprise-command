@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { HealthState, L1SummaryExtract, TrendDirection } from '../../types';
+import { HealthState, OverviewExtract, TrendDirection } from '../../types';
 
 /** Neutral trend glyphs — direction of travel only, never a health verdict. */
 const TREND_GLYPH: Record<TrendDirection, string> = {
@@ -28,7 +28,7 @@ export interface ProcessTileProps {
   ownerTeam?: string;
   /** Precomputed upstream — display-only mapping to color tokens. */
   health: HealthState;
-  summary: L1SummaryExtract;
+  summary: OverviewExtract;
   /**
    * Staleness flag computed upstream (heartbeat gap detection).
    * When true the tile desaturates to signal "do not trust this data".
