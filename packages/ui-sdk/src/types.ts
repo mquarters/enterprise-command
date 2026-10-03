@@ -41,6 +41,8 @@ export interface MetricReading {
   label: string;
   value: string | number;
   unit?: string;
+  /** Computed upstream (mock engine); components only display it. */
+  status?: HealthState;
 }
 
 // ============================================================================

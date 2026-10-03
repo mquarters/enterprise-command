@@ -13,6 +13,9 @@
 import {
   HealthState,
   ArchetypePayload,
+  DetailExtract,
+  EnrichedEntity,
+  MetricReading,
   ProcessStatePayload,
   TrendDirection,
 } from '../types';
@@ -203,6 +206,112 @@ function heatRow(
 }
 
 // ============================================================================
+// Entity chains (seed authoring helpers + bounded per-tick drift)
+// ============================================================================
+
+const metric = (
+  label: string,
+  value: string | number,
+  unit: string | undefined,
+  status: HealthState = 'HEALTHY'
+): MetricReading => ({ label, value, unit, status });
+
+/** Detail-extract builder (seed-authoring shorthand). */
+function det(
+  narrativeSummary: string,
+  impactedCount: number,
+  impactedUnit: string,
+  primaryFailureKey?: string,
+  metrics?: MetricReading[]
+): DetailExtract {
+  return { narrativeSummary, impactedCount, impactedUnit, primaryFailureKey, metrics };
+}
+
+/**
+ * Builds one drillable sub-entity. Its health state is rolled up from the
+ * supplied metric readings — computed HERE, upstream of any component
+ * (Principle 1). `depth` is derived from the parent: processes host depth-2
+ * entities; entity chains terminate at DEPTH_CAP.
+ */
+function ent(
+  parentId: string,
+  entityId: string,
+  entityKind: string,
+  label: string,
+  healthState: HealthState,
+  detail: DetailExtract,
+  deep?: ArchetypePayload
+): EnrichedEntity {
+  return {
+    entityId,
+    parentId,
+    entityKind,
+    label,
+    depth: parentId.startsWith('proc-') ? 2 : 3,
+    healthState,
+    detail,
+    deep,
+  };
+}
+
+const chain = (...entities: EnrichedEntity[]): Record<string, EnrichedEntity> =>
+  Object.fromEntries(entities.map((e) => [e.entityId, e]));
+
+/**
+ * Bounded entity-chain drift: at most TWO entity chains are touched per
+ * envelope per tick (never the full tree). Touched chains get jittered
+ * readings, a 15% status roll (same rule as domain drift), and — when the
+ * roll changes health — re-derived blast radius and narrative. This stays
+ * generator-side math; components only ever display the result.
+ */
+function driftEntityChains(
+  entities: Record<string, EnrichedEntity> | undefined
+): Record<string, EnrichedEntity> | undefined {
+  if (!entities) return entities;
+  const keys = Object.keys(entities);
+  if (keys.length === 0) return entities;
+
+  const touched = new Set<string>();
+  const budget = Math.min(2, keys.length);
+  while (touched.size < budget) {
+    touched.add(keys[Math.floor(Math.random() * keys.length)]);
+  }
+
+  let next: Record<string, EnrichedEntity> | null = null;
+  for (const key of touched) {
+    const entity = entities[key];
+    const healthState = driftStatus(entity.healthState);
+    const metrics = entity.detail.metrics?.map((reading) => ({
+      ...reading,
+      value:
+        typeof reading.value === 'number'
+          ? jitter(reading.value, 0.15, 0, Number.MAX_SAFE_INTEGER)
+          : reading.value,
+    }));
+    const healthChanged = healthState !== entity.healthState;
+    const updated: EnrichedEntity = {
+      ...entity,
+      healthState,
+      detail: {
+        ...entity.detail,
+        impactedCount: healthChanged
+          ? driftImpactedCount(healthState, entity.detail.impactedCount)
+          : entity.detail.impactedCount,
+        narrativeSummary: healthChanged
+          ? narrativeFor(entity.label, healthState)
+          : entity.detail.narrativeSummary,
+        metrics,
+      },
+    };
+    if (next === null) {
+      next = { ...entities };
+    }
+    next[key] = updated;
+  }
+  return next ?? entities;
+}
+
+// ============================================================================
 // Envelope tick
 // ============================================================================
 
@@ -235,6 +344,7 @@ export function nextMockState(previous: ProcessStatePayload): ProcessStatePayloa
         : previous.detail.narrativeSummary,
     },
     deep,
+    entities: driftEntityChains(previous.entities),
     smartLaunchers: previous.smartLaunchers,
   };
 }
@@ -279,6 +389,65 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { source: 'n2', target: 'n3', active: false },
       ],
     },
+    entities: chain(
+      ent(
+        'proc-payment-clearing-01',
+        'n1',
+        'FLOW_NODE',
+        'Ingest Batch',
+        'WARNING',
+        det(
+          'Batch intake queue is backing up while the validation lane drains slowly; oldest batch is 14 minutes stale.',
+          212,
+          'batches',
+          'FAIL_BATCH_QUEUE_BACKLOG',
+          [
+            metric('Queue Depth', 212, 'batches', 'WARNING'),
+            metric('Oldest Message Age', 14, 'min', 'WARNING'),
+            metric('Ingestion Rate', 118, 'batches/min', 'HEALTHY'),
+          ]
+        ),
+        {
+          archetype: 'FLOW',
+          nodes: [
+            { id: 'c1', label: 'Batch Parser', status: 'HEALTHY', durationMs: 12 },
+            { id: 'c2', label: 'Dedup Cache', status: 'WARNING', durationMs: 38, errorRate: 2.1 },
+            { id: 'c3', label: 'Queue Writer', status: 'CRITICAL', durationMs: 210, errorRate: 9.8 },
+          ],
+          edges: [
+            { source: 'c1', target: 'c2', active: true },
+            { source: 'c2', target: 'c3', active: true },
+          ],
+        }
+      ),
+      // Depth-3 members of Ingest Batch's own chain — chains terminate here.
+      ent('n1', 'c1', 'QUEUE_CONSUMER', 'Batch Parser', 'HEALTHY',
+        det('Parser pool nominal; no poison messages observed.', 0, 'messages', undefined, [
+          metric('Decode p50', 12, 'ms', 'HEALTHY'),
+          metric('Parse Errors', 0.02, '%', 'HEALTHY'),
+        ])),
+      ent('n1', 'c2', 'QUEUE_CONSUMER', 'Dedup Cache', 'WARNING',
+        det('Dedup lookups miss 4.3% of re-published batches; duplicate writes reach the ledger.', 312, 'batches', 'WARN_DEDUP_MISS_RATE', [
+          metric('Dedup Hit Rate', 95.7, '%', 'WARNING'),
+          metric('Lookup Latency', 4.8, 'ms', 'HEALTHY'),
+        ])),
+      ent('n1', 'c3', 'QUEUE_CONSUMER', 'Queue Writer', 'CRITICAL',
+        det('Writer stalled on broker ACK timeouts; back-pressure propagating upstream.', 812, 'in-flight batches', 'FAIL_KAFKA_ACK_TIMEOUT', [
+          metric('Ack Timeout Rate', 6.4, '%', 'CRITICAL'),
+          metric('In-Flight Batches', 812, 'batches', 'CRITICAL'),
+          metric('Writer Lag', 41, 's', 'WARNING'),
+        ])),
+      ent('proc-payment-clearing-01', 'n2', 'FLOW_NODE', 'FedWire Validation', 'CRITICAL',
+        det('TLS handshake timeouts (HTTP 504) on 12.4% of validation calls.', 1770, 'transactions', 'ERR_FEDWIRE_TIMEOUT_504', [
+          metric('Step Latency', 1350, 'ms', 'CRITICAL'),
+          metric('Timeout Rate', 12.4, '%', 'CRITICAL'),
+        ])),
+      ent('proc-payment-clearing-01', 'n3', 'FLOW_NODE', 'Ledger Post', 'UNKNOWN',
+        det('No heartbeat from ledger relay since 12:04 — posting latency unverified.', 0, 'records', 'STALE_LEDGER_HEARTBEAT', [
+          metric('Heartbeat Gap', 41, 's', 'UNKNOWN'),
+          metric('Replay Queue', 214, 'records', 'UNKNOWN'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -327,6 +496,23 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { source: 'n2', target: 'n3', active: true },
       ],
     },
+    entities: chain(
+      ent('proc-auth-pipeline-02', 'n1', 'FLOW_NODE', 'Token Mint', 'HEALTHY',
+        det('Token minting nominal; 8 ms p50 issuance latency.', 0, 'sessions', undefined, [
+          metric('Mint p50', 8, 'ms', 'HEALTHY'),
+          metric('Clock Skew', 2, 'ms', 'HEALTHY'),
+        ])),
+      ent('proc-auth-pipeline-02', 'n2', 'FLOW_NODE', 'Session Cache', 'HEALTHY',
+        det('Cache hit rate 99.2%; evictions within budget.', 0, 'sessions', undefined, [
+          metric('Cache Hit Rate', 99.2, '%', 'HEALTHY'),
+          metric('Evictions', 3, '/min', 'HEALTHY'),
+        ])),
+      ent('proc-auth-pipeline-02', 'n3', 'FLOW_NODE', 'Consent Gate', 'HEALTHY',
+        det('Consent checks pass within budget; deny rate nominal.', 0, 'sessions', undefined, [
+          metric('Consent p50', 12, 'ms', 'HEALTHY'),
+          metric('Deny Rate', 0.4, '%', 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -378,6 +564,38 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { nodeId: 'controller-02', status: 'HEALTHY', cpuUtilizationPct: 19, memoryUtilizationPct: 31 },
       ],
     },
+    entities: chain(
+      ent('proc-kafka-east-03', 'broker-east-01', 'CLUSTER_NODE', 'broker-east-01', 'HEALTHY',
+        det('Broker steady; replica lag nominal.', 0, 'partitions', undefined, [
+          metric('CPU Utilization', 42, '%', 'HEALTHY'),
+          metric('Memory Utilization', 58, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kafka-east-03', 'broker-east-02', 'CLUSTER_NODE', 'broker-east-02', 'HEALTHY',
+        det('Broker steady; replica lag nominal.', 0, 'partitions', undefined, [
+          metric('CPU Utilization', 38, '%', 'HEALTHY'),
+          metric('Memory Utilization', 61, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kafka-east-03', 'broker-east-03', 'CLUSTER_NODE', 'broker-east-03', 'WARNING',
+        det('CPU at 88% under rebalance load; leader for 2 hot FX-quote topics.', 9400000, 'msgs/day', 'WARN_BROKER_PRESSURE_EAST', [
+          metric('CPU Utilization', 88, '%', 'WARNING'),
+          metric('Memory Utilization', 79, '%', 'WARNING'),
+        ])),
+      ent('proc-kafka-east-03', 'broker-east-04', 'CLUSTER_NODE', 'broker-east-04', 'CRITICAL',
+        det('Broker saturated — leader for 3 hot FX-quote topics; throttle under consideration.', 14400000, 'msgs/day', 'WARN_BROKER_PRESSURE_EAST', [
+          metric('CPU Utilization', 96, '%', 'CRITICAL'),
+          metric('Memory Utilization', 92, '%', 'CRITICAL'),
+        ])),
+      ent('proc-kafka-east-03', 'controller-01', 'CLUSTER_NODE', 'controller-01', 'HEALTHY',
+        det('Controller quorum nominal; no leadership elections pending.', 0, 'elections', undefined, [
+          metric('CPU Utilization', 21, '%', 'HEALTHY'),
+          metric('Memory Utilization', 34, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kafka-east-03', 'controller-02', 'CLUSTER_NODE', 'controller-02', 'HEALTHY',
+        det('Controller quorum nominal; no leadership elections pending.', 0, 'elections', undefined, [
+          metric('CPU Utilization', 19, '%', 'HEALTHY'),
+          metric('Memory Utilization', 31, '%', 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -428,6 +646,22 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { ruleId: 'r3', description: 'Tokenization Rotation', condition: 'rotate <= 30 days', actualValue: '45 days', targetValue: '30 days', passed: false },
       ],
     },
+    entities: chain(
+      ent('proc-pci-gate-04', 'r1', 'RULE', 'PAN Masking Active', 'HEALTHY',
+        det('Masking active on all lanes; no plaintext exposure observed.', 0, 'records at risk', undefined, [
+          metric('Mask Coverage', 100, '%', 'HEALTHY'),
+        ])),
+      ent('proc-pci-gate-04', 'r2', 'RULE', 'TLS Version Check', 'CRITICAL',
+        det('Scrubbing lane negotiates TLS 1.2; the standard mandates 1.3.', 8400, 'records at risk', 'FAIL_TLS_VERSION_CHECK', [
+          metric('Negotiated TLS', '1.2', undefined, 'CRITICAL'),
+          metric('Mandated Floor', '1.3', undefined, 'HEALTHY'),
+        ])),
+      ent('proc-pci-gate-04', 'r3', 'RULE', 'Tokenization Rotation', 'WARNING',
+        det('Token rotation window is 45 days stale against the 30-day maximum.', 2400, 'tokens', 'FAIL_TOKEN_ROTATION_OVERDUE', [
+          metric('Rotation Age', 45, 'days', 'WARNING'),
+          metric('Max Window', 30, 'days', 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -480,6 +714,18 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { timestamp: '10:06', value: 118 },
       ],
     },
+    entities: chain(
+      ent('proc-card-latency-05', '10:03', 'OBSERVATION', 'Sample @ 10:03', 'WARNING',
+        det('Authorization latency burst at 132 ms — tracking toward the upper control band.', 612, 'authorizations', 'WARN_AUTH_LATENCY_BURST', [
+          metric('Sample Latency', 132, 'ms', 'WARNING'),
+          metric('Band Position', 'upper', undefined, 'WARNING'),
+        ])),
+      ent('proc-card-latency-05', '10:04', 'OBSERVATION', 'Sample @ 10:04', 'HEALTHY',
+        det('Sample latency nominal at 112 ms; inside the control band.', 0, 'authorizations', undefined, [
+          metric('Sample Latency', 112, 'ms', 'HEALTHY'),
+          metric('Band Position', 'inside limits', undefined, 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -528,6 +774,17 @@ export const mockProcessStates: ProcessStatePayload[] = [
         { ruleId: 'r2', description: 'Reserve Coverage', condition: 'coverage >= 110%', actualValue: 118, targetValue: 110, passed: true },
       ],
     },
+    entities: chain(
+      ent('proc-liquidity-gate-06', 'r1', 'RULE', 'Liquidity Ratio Floor', 'CRITICAL',
+        det('Liquidity ratio 11.2% is below the 15% regulatory floor; two rails throttled.', 2, 'settlement rails', 'FAIL_LIQUIDITY_RATIO_FLOOR', [
+          metric('Liquidity Ratio', 11.2, '%', 'CRITICAL'),
+          metric('Regulatory Floor', 15, '%', 'HEALTHY'),
+        ])),
+      ent('proc-liquidity-gate-06', 'r2', 'RULE', 'Reserve Coverage', 'HEALTHY',
+        det('Reserve coverage 118% exceeds the 110% requirement.', 0, 'settlement rails', undefined, [
+          metric('Coverage Ratio', 118, '%', 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
@@ -579,6 +836,26 @@ export const mockProcessStates: ProcessStatePayload[] = [
         heatRow('svc-ems-ingress', 'EMS Order Ingress', [0.4, 0.6, 0.3, 0.5, 0.4, 0.2, 0.5, 0.3, 0.4, 0.6, 0.3, 0.4]),
       ],
     },
+    entities: chain(
+      ent('proc-fx-quote-mesh-07', 'svc-otc-quotes', 'HEATMAP_ROW', 'OTC Quote Gateway', 'WARNING',
+        det('Quote error bursts up to 1.8%; staleness risk on EUR/USD pairs.', 44, 'quotes', 'WARN_OTC_QUOTE_BURST', [
+          metric('Peak Error Rate', 1.8, '%', 'WARNING'),
+          metric('Quote Throughput', 90, 'quotes/min', 'HEALTHY'),
+        ])),
+      ent('proc-fx-quote-mesh-07', 'svc-fx-matcher', 'HEATMAP_ROW', 'FX Matching Engine', 'WARNING',
+        det('Matching engine throttles on stale feeds; error bursts to 3.9% in the last hour.', 240, 'quotes', 'FAIL_FX_QUOTE_STALE_SLA', [
+          metric('Peak Error Rate', 3.9, '%', 'WARNING'),
+          metric('Feed Freshness', 45, 's', 'WARNING'),
+        ])),
+      ent('proc-fx-quote-mesh-07', 'svc-nostro-recon', 'HEATMAP_ROW', 'Nostro Reconciliation', 'HEALTHY',
+        det('Recon feed nominal; error bursts never exceeded 0.4%.', 0, 'reconciliations', undefined, [
+          metric('Peak Error Rate', 0.4, '%', 'HEALTHY'),
+        ])),
+      ent('proc-fx-quote-mesh-07', 'svc-ems-ingress', 'HEATMAP_ROW', 'EMS Order Ingress', 'HEALTHY',
+        det('Order ingress nominal; error bursts never exceeded 0.6%.', 0, 'orders', undefined, [
+          metric('Peak Error Rate', 0.6, '%', 'HEALTHY'),
+        ])),
+    ),
     smartLaunchers: [
       {
         id: 'sl-1',
