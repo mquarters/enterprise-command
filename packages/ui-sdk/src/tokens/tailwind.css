@@ -1,0 +1,8 @@
+/**
+ * Tailwind entry for the dev harness.
+ * Design tokens live in variables.css; component classes in domain-component.css.
+ * Import order in main.tsx: variables.css -> domain-component.css -> this file.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
