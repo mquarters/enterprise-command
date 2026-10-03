@@ -1,13 +1,26 @@
 {
+  "name": "vantage-ui",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "dependencies": {
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "typescript": "^7.0.2",
+    "playwright": "^1.63.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
     "vite": "^8.3.2"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @platform/ui-sdk",
+    "build": "npm run build -w @platform/ui-sdk",
+    "typecheck": "npm run typecheck -w @platform/ui-sdk"
   }
 }
