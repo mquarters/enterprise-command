@@ -147,7 +147,11 @@ trail = [{P, deep}, {n1, deep}, {c3, detail}]     → Queue Writer depth-3 detai
   `--drawer-width-entity` (480px/340px), each with a matching Tailwind class mapping.
 - A detail drawer floats above a backdrop (the grid, or the parent canvas rendered
   `aria-hidden` + `pointer-events-none`); the backdrop is contextual depth cue, never
-  a second interactive surface.
+  a second interactive surface. Canvas nodes that mirror a drillable entity carry that
+  entity's id as a seed-data `entityId` link and render as the ONE live instance on
+  canvas pages (button → entity drawer; nav affordance only, colors stay upstream).
+  The desk chip strip therefore lists only children with NO canvas instance — every
+  entity keeps exactly one clickable instance per page, never zero and never two.
 
 ## 4. The Five Canvas Layouts, at Any Scale
 

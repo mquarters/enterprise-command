@@ -315,9 +315,49 @@ function driftEntityChains(
 // Envelope tick
 // ============================================================================
 
+/**
+ * Chain-mirror resync (generator-side, Principle 1): nodes that carry an
+ * `entityId` link are re-stamped with the drifted chain entity's current
+ * healthState, so the canvas copy of a service never disagrees with the
+ * entity drawer opened from it. The link itself is seeded data resolved
+ * through a keyed lookup — the switch below mirrors driftDeepPayload's
+ * per-shape drift style; no archetype assumption reaches Shell or UI.
+ */
+function mirrorNodes<T extends { status: HealthState; entityId?: string }>(
+  nodes: T[],
+  entities: Record<string, EnrichedEntity>
+): T[] {
+  return nodes.map((node) => {
+    const mirror = node.entityId ? entities[node.entityId] : undefined;
+    return mirror && mirror.healthState !== node.status
+      ? { ...node, status: mirror.healthState }
+      : node;
+  });
+}
+
+function mirrorChainHealth(
+  payload: ArchetypePayload,
+  entities: Record<string, EnrichedEntity> | undefined
+): ArchetypePayload {
+  if (!entities) return payload;
+  switch (payload.archetype) {
+    case 'FLOW': {
+      const nodes = mirrorNodes(payload.nodes, entities);
+      return nodes.some((n, i) => n !== payload.nodes[i]) ? { ...payload, nodes } : payload;
+    }
+    case 'TOPOLOGY': {
+      const nodes = mirrorNodes(payload.nodes, entities);
+      return nodes.some((n, i) => n !== payload.nodes[i]) ? { ...payload, nodes } : payload;
+    }
+    default:
+      return payload;
+  }
+}
+
 /** Produces a fresh, drifted copy of an envelope. Never mutates the input. */
 export function nextMockState(previous: ProcessStatePayload): ProcessStatePayload {
-  const deep = driftDeepPayload(previous.deep);
+  const entities = driftEntityChains(previous.entities);
+  const deep = mirrorChainHealth(driftDeepPayload(previous.deep), entities);
   const healthState = deriveHealthState(deep);
   const healthChanged = healthState !== previous.header.healthState;
 
@@ -344,7 +384,7 @@ export function nextMockState(previous: ProcessStatePayload): ProcessStatePayloa
         : previous.detail.narrativeSummary,
     },
     deep,
-    entities: driftEntityChains(previous.entities),
+    entities,
     smartLaunchers: previous.smartLaunchers,
   };
 }
@@ -380,9 +420,9 @@ export const mockProcessStates: ProcessStatePayload[] = [
     deep: {
       archetype: 'FLOW',
       nodes: [
-        { id: 'n1', label: 'Ingest Batch', status: 'HEALTHY', durationMs: 45 },
-        { id: 'n2', label: 'FedWire Validation', status: 'CRITICAL', durationMs: 1350, errorRate: 12.4 },
-        { id: 'n3', label: 'Ledger Post', status: 'UNKNOWN' },
+        { id: 'n1', label: 'Ingest Batch', status: 'WARNING', durationMs: 45, entityId: 'n1' },
+        { id: 'n2', label: 'FedWire Validation', status: 'CRITICAL', durationMs: 1350, errorRate: 12.4, entityId: 'n2' },
+        { id: 'n3', label: 'Ledger Post', status: 'UNKNOWN', entityId: 'n3' },
       ],
       edges: [
         { source: 'n1', target: 'n2', active: true },
@@ -410,9 +450,9 @@ export const mockProcessStates: ProcessStatePayload[] = [
         {
           archetype: 'FLOW',
           nodes: [
-            { id: 'c1', label: 'Batch Parser', status: 'HEALTHY', durationMs: 12 },
-            { id: 'c2', label: 'Dedup Cache', status: 'WARNING', durationMs: 38, errorRate: 2.1 },
-            { id: 'c3', label: 'Queue Writer', status: 'CRITICAL', durationMs: 210, errorRate: 9.8 },
+            { id: 'c1', label: 'Batch Parser', status: 'HEALTHY', durationMs: 12, entityId: 'c1' },
+            { id: 'c2', label: 'Dedup Cache', status: 'WARNING', durationMs: 38, errorRate: 2.1, entityId: 'c2' },
+            { id: 'c3', label: 'Queue Writer', status: 'CRITICAL', durationMs: 210, errorRate: 9.8, entityId: 'c3' },
           ],
           edges: [
             { source: 'c1', target: 'c2', active: true },
@@ -487,9 +527,9 @@ export const mockProcessStates: ProcessStatePayload[] = [
     deep: {
       archetype: 'FLOW',
       nodes: [
-        { id: 'n1', label: 'Token Mint', status: 'HEALTHY', durationMs: 8 },
-        { id: 'n2', label: 'Session Cache', status: 'HEALTHY', durationMs: 3 },
-        { id: 'n3', label: 'Consent Gate', status: 'HEALTHY', durationMs: 12 },
+        { id: 'n1', label: 'Token Mint', status: 'HEALTHY', durationMs: 8, entityId: 'n1' },
+        { id: 'n2', label: 'Session Cache', status: 'HEALTHY', durationMs: 3, entityId: 'n2' },
+        { id: 'n3', label: 'Consent Gate', status: 'HEALTHY', durationMs: 12, entityId: 'n3' },
       ],
       edges: [
         { source: 'n1', target: 'n2', active: true },
@@ -556,12 +596,12 @@ export const mockProcessStates: ProcessStatePayload[] = [
       clusterName: 'US-East Production Mesh',
       totalNodes: 6,
       nodes: [
-        { nodeId: 'broker-east-01', status: 'HEALTHY', cpuUtilizationPct: 42, memoryUtilizationPct: 58 },
-        { nodeId: 'broker-east-02', status: 'HEALTHY', cpuUtilizationPct: 38, memoryUtilizationPct: 61 },
-        { nodeId: 'broker-east-03', status: 'WARNING', cpuUtilizationPct: 88, memoryUtilizationPct: 79 },
-        { nodeId: 'broker-east-04', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 92 },
-        { nodeId: 'controller-01', status: 'HEALTHY', cpuUtilizationPct: 21, memoryUtilizationPct: 34 },
-        { nodeId: 'controller-02', status: 'HEALTHY', cpuUtilizationPct: 19, memoryUtilizationPct: 31 },
+        { nodeId: 'broker-east-01', status: 'HEALTHY', cpuUtilizationPct: 42, memoryUtilizationPct: 58, entityId: 'broker-east-01' },
+        { nodeId: 'broker-east-02', status: 'HEALTHY', cpuUtilizationPct: 38, memoryUtilizationPct: 61, entityId: 'broker-east-02' },
+        { nodeId: 'broker-east-03', status: 'WARNING', cpuUtilizationPct: 88, memoryUtilizationPct: 79, entityId: 'broker-east-03' },
+        { nodeId: 'broker-east-04', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 92, entityId: 'broker-east-04' },
+        { nodeId: 'controller-01', status: 'HEALTHY', cpuUtilizationPct: 21, memoryUtilizationPct: 34, entityId: 'controller-01' },
+        { nodeId: 'controller-02', status: 'HEALTHY', cpuUtilizationPct: 19, memoryUtilizationPct: 31, entityId: 'controller-02' },
       ],
     },
     entities: chain(

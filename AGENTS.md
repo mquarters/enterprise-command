@@ -85,7 +85,10 @@ Chromium and its headless shell are already installed. If launch fails with
   (process-scale drawer = 480px/`z-drawer`; entity-scale = 340px/`z-detail`, both
   token-driven). `DrawerShell` owns the ONE global Esc handler + ONE focus manager —
   the Shell mounts at most one drawer at a time, so Esc pops exactly one hop.
-  `ArchetypeCanvas` mounts ANY entity's deep payload via registry lookup.
+  `ArchetypeCanvas` mounts ANY entity's deep payload via registry lookup. On a canvas
+  page, a node whose seed-data `entityId` link mirrors a drillable entity IS that
+  entity's one clickable instance (button, nav-only); the chip strip yields to it and
+  lists unmirrored children, so no entity has zero or two drill affordances.
 - **Principle 1 — never compute health, per primitive.** OverviewTile only maps a
   precomputed `health`/per-reading status to `var(--status-*)` token classes
   (display-only). DetailDrawer displays the upstream narrative, blast radius and

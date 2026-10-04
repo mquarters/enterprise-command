@@ -15,7 +15,11 @@
  * computes them, never branches on an archetype name, and never assumes a
  * layout is bound to a scale. Deep views mount through pluginRegistry
  * lookups (subEntityId manifest first, process DeepComponent fallback,
- * visible canvas fallback last).
+ * visible canvas fallback last). Canvas nodes that MIRROR a drillable entity
+ * (payload nodes carrying a seeded entityId link) are themselves the live
+ * drill affordance for that entity: the workbench chip strip lists only
+ * children with no canvas instance, so every entity keeps exactly ONE
+ * clickable instance per page — never zero, never two.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -253,13 +257,30 @@ function Shell() {
 
   const topChildren = top ? childrenOf(top, states) : [];
 
+  /**
+   * Children already mirrored by a linked canvas node (generic keyed
+   * lookup — no archetype names). Mirrored members keep exactly one live
+   * affordance: the canvas node itself, so the chip strip yields to it.
+   * Unmirrored children (rule gates, heat rows, observations…) stay
+   * chip-drillable — no entity ever loses its only drill path.
+   */
+  const deepPayload = current?.deep;
+  const mirroredIds = new Set<string>(
+    deepPayload && 'nodes' in deepPayload
+      ? [...deepPayload.nodes]
+          .map((node) => node.entityId)
+          .filter((id): id is string => id !== undefined)
+      : []
+  );
+  const drillChildren = topChildren.filter((child) => !mirroredIds.has(child.entityId));
+
   const childDrills = (
     <section aria-label="Drill into sub-entities" data-testid="child-drills" className="mt-8">
       <h3 className="text-console text-ink-secondary uppercase tracking-wider mb-3">
         Sub-entity chains (depth {Math.min((top?.target.entityId ? 3 : 2), DEPTH_CAP)} ≤ cap {DEPTH_CAP})
       </h3>
       <div className="flex flex-wrap gap-3">
-        {topChildren.map((child) => (
+        {drillChildren.map((child) => (
           <OverviewTile
             key={child.entityId}
             density="desk"
@@ -329,12 +350,15 @@ function Shell() {
             data={current.deep!}
             health={current.health}
             registry={pluginRegistry}
+            onSelectEntity={(entityId) =>
+              top && drillInto({ processId: top.target.processId, entityId })
+            }
             onExecuteMitigation={async (actionKey, payload) => {
               console.info('[Shell] Mitigation dispatched', actionKey, payload);
               window.alert(`Mitigation dispatched: ${actionKey}`);
             }}
           />
-          {topChildren.length > 0 && childDrills}
+          {drillChildren.length > 0 && childDrills}
         </main>
       </div>
     );

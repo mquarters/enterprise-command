@@ -90,6 +90,11 @@ export interface FlowArchetypePayload {
     status: HealthState;
     durationMs?: number;
     errorRate?: number;
+    /**
+     * Display link to the EnrichedEntity this node mirrors (same service,
+     * same id). Seed data + nav affordance only — never a health source.
+     */
+    entityId?: string;
   }>;
   edges: Array<{
     source: string;
@@ -123,6 +128,11 @@ export interface TopologyArchetypePayload {
     status: HealthState;
     cpuUtilizationPct: number;
     memoryUtilizationPct: number;
+    /**
+     * Display link to the EnrichedEntity this node chip mirrors (same
+     * broker/service, same id). Seed data + nav affordance only.
+     */
+    entityId?: string;
   }>;
 }
 

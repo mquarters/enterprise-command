@@ -1,10 +1,19 @@
 import React from 'react';
 import { FlowArchetypeProps } from '../../types';
 
+/**
+ * Nodes that mirror a drillable EnrichedEntity carry a seed-data `entityId`
+ * link (Principle 1: the link is display/nav knowledge, not derived here).
+ * With an onSelectEntity handler mounted, such a node renders as ONE live
+ * affordance (button) instead of an inert label + a duplicate chip below;
+ * without the handler (e.g. the dimmed drawer backdrop) nothing is clickable
+ * anywhere — the Shell's backdrop copy and this one can never both be live.
+ */
 export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
   processId,
   data,
   health,
+  onSelectEntity,
   onExecuteMitigation,
 }) => {
   return (
@@ -30,27 +39,45 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
       <div className="flex flex-wrap items-center gap-4 my-8">
         {data.nodes.map((node, index) => {
           const outgoingEdge = data.edges.find((e) => e.source === node.id);
+          const linked = node.entityId;
+          const nodeBody = (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="font-semibold text-desk-body">{node.label}</span>
+                <span className="text-console opacity-75">{node.id}</span>
+              </div>
+
+              <div className="text-console opacity-80 flex flex-col gap-0.5">
+                {node.durationMs !== undefined && <span>Lat: {node.durationMs}ms</span>}
+                {node.errorRate !== undefined && (
+                  <span className={node.errorRate > 5 ? 'text-status-critical-fg' : ''}>
+                    Err: {node.errorRate}%
+                  </span>
+                )}
+              </div>
+            </>
+          );
           return (
             <React.Fragment key={node.id}>
-              {/* Node Card */}
-              <div
-                className="flow-node shadow-lg flex flex-col justify-between"
-                data-status={node.status}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-semibold text-desk-body">{node.label}</span>
-                  <span className="text-console opacity-75">{node.id}</span>
+              {/* Node Card — a linked node with a live handler IS the drill affordance */}
+              {linked && onSelectEntity ? (
+                <button
+                  type="button"
+                  className="flow-node shadow-lg flex flex-col justify-between cursor-pointer"
+                  data-entity={linked}
+                  data-status={node.status}
+                  onClick={() => onSelectEntity(linked)}
+                >
+                  {nodeBody}
+                </button>
+              ) : (
+                <div
+                  className="flow-node shadow-lg flex flex-col justify-between"
+                  data-status={node.status}
+                >
+                  {nodeBody}
                 </div>
-
-                <div className="text-console opacity-80 flex flex-col gap-0.5">
-                  {node.durationMs !== undefined && <span>Lat: {node.durationMs}ms</span>}
-                  {node.errorRate !== undefined && (
-                    <span className={node.errorRate > 5 ? 'text-status-critical-fg' : ''}>
-                      Err: {node.errorRate}%
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
 
               {/* Connector Arrow / Edge */}
               {index < data.nodes.length - 1 && (
