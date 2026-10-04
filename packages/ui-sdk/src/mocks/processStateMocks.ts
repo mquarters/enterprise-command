@@ -13,6 +13,7 @@
 import {
   HealthState,
   ArchetypePayload,
+  InfraWatchEntry,
   DetailExtract,
   EnrichedEntity,
   MetricReading,
@@ -390,10 +391,12 @@ export function nextMockState(previous: ProcessStatePayload): ProcessStatePayloa
 }
 
 /**
- * Seed data — seven processes across the five L3 archetypes
+ * Seed data — six business processes plus the four infrastructure-fleet
+ * envelopes (Kafka, Databases, Kubernetes, EC2). Envelope health is
+ * rolled up from each envelope's own elements and drifts with them.
  */
 
-export const mockProcessStates: ProcessStatePayload[] = [
+const SEED_PROCESS_STATES: ProcessStatePayload[] = [
   {
     header: {
       processId: 'proc-payment-clearing-01',
@@ -570,70 +573,110 @@ export const mockProcessStates: ProcessStatePayload[] = [
   },
   {
     header: {
-      processId: 'proc-kafka-east-03',
-      title: 'Kafka Cluster US-East',
+      processId: 'proc-kafka-infra-03',
+      title: 'Kafka Infrastructure (Fleet)',
       ownerTeam: 'Data Platform',
       updatedAt: new Date().toISOString(),
-      healthState: 'WARNING',
+      healthState: 'CRITICAL',
       staleHeartbeatThresholdSeconds: 10,
     },
     overview: {
-      heroMetricLabel: 'Cluster CPU',
+      heroMetricLabel: 'Broker CPU',
       heroMetricValue: 88,
       heroMetricUnit: '%',
       trend: 'UP',
     },
     detail: {
       narrativeSummary:
-        'Two brokers in the US-East mesh are above 85% utilization; partition rebalance is in progress.',
-      impactedCount: 312000000,
+        'Two US-East brokers and two EU-West brokers are above the 85% utilization floor; a partition rebalance is in progress across both meshes.',
+      impactedCount: 42800000,
       impactedUnit: 'msgs/day',
       primaryFailureKey: 'WARN_BROKER_PRESSURE_EAST',
       incidentStartedAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
     },
     deep: {
       archetype: 'TOPOLOGY',
-      clusterName: 'US-East Production Mesh',
-      totalNodes: 6,
+      clusterName: 'Kafka Fleet Mesh — US-East + EU-West',
+      totalNodes: 10,
       nodes: [
         { nodeId: 'broker-east-01', status: 'HEALTHY', cpuUtilizationPct: 42, memoryUtilizationPct: 58, entityId: 'broker-east-01' },
         { nodeId: 'broker-east-02', status: 'HEALTHY', cpuUtilizationPct: 38, memoryUtilizationPct: 61, entityId: 'broker-east-02' },
         { nodeId: 'broker-east-03', status: 'WARNING', cpuUtilizationPct: 88, memoryUtilizationPct: 79, entityId: 'broker-east-03' },
         { nodeId: 'broker-east-04', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 92, entityId: 'broker-east-04' },
-        { nodeId: 'controller-01', status: 'HEALTHY', cpuUtilizationPct: 21, memoryUtilizationPct: 34, entityId: 'controller-01' },
-        { nodeId: 'controller-02', status: 'HEALTHY', cpuUtilizationPct: 19, memoryUtilizationPct: 31, entityId: 'controller-02' },
+        { nodeId: 'controller-east-01', status: 'HEALTHY', cpuUtilizationPct: 21, memoryUtilizationPct: 34, entityId: 'controller-east-01' },
+        { nodeId: 'broker-eu-01', status: 'WARNING', cpuUtilizationPct: 88, memoryUtilizationPct: 72, entityId: 'broker-eu-01' },
+        { nodeId: 'broker-eu-02', status: 'HEALTHY', cpuUtilizationPct: 31, memoryUtilizationPct: 44, entityId: 'broker-eu-02' },
+        { nodeId: 'broker-eu-03', status: 'CRITICAL', cpuUtilizationPct: 97, memoryUtilizationPct: 71, entityId: 'broker-eu-03' },
+        { nodeId: 'controller-eu-01', status: 'HEALTHY', cpuUtilizationPct: 18, memoryUtilizationPct: 29, entityId: 'controller-eu-01' },
+        { nodeId: 'controller-eu-02', status: 'UNKNOWN', cpuUtilizationPct: 12, memoryUtilizationPct: 22, entityId: 'controller-eu-02' },
       ],
     },
     entities: chain(
-      ent('proc-kafka-east-03', 'broker-east-01', 'CLUSTER_NODE', 'broker-east-01', 'HEALTHY',
+      ent('proc-kafka-infra-03', 'broker-east-01', 'KAFKA_BROKER', 'broker-east-01', 'HEALTHY',
         det('Broker steady; replica lag nominal.', 0, 'partitions', undefined, [
           metric('CPU Utilization', 42, '%', 'HEALTHY'),
           metric('Memory Utilization', 58, '%', 'HEALTHY'),
         ])),
-      ent('proc-kafka-east-03', 'broker-east-02', 'CLUSTER_NODE', 'broker-east-02', 'HEALTHY',
+      ent('proc-kafka-infra-03', 'broker-east-02', 'KAFKA_BROKER', 'broker-east-02', 'HEALTHY',
         det('Broker steady; replica lag nominal.', 0, 'partitions', undefined, [
           metric('CPU Utilization', 38, '%', 'HEALTHY'),
           metric('Memory Utilization', 61, '%', 'HEALTHY'),
         ])),
-      ent('proc-kafka-east-03', 'broker-east-03', 'CLUSTER_NODE', 'broker-east-03', 'WARNING',
+      ent('proc-kafka-infra-03', 'broker-east-03', 'KAFKA_BROKER', 'broker-east-03', 'WARNING',
         det('CPU at 88% under rebalance load; leader for 2 hot FX-quote topics.', 9400000, 'msgs/day', 'WARN_BROKER_PRESSURE_EAST', [
           metric('CPU Utilization', 88, '%', 'WARNING'),
           metric('Memory Utilization', 79, '%', 'WARNING'),
         ])),
-      ent('proc-kafka-east-03', 'broker-east-04', 'CLUSTER_NODE', 'broker-east-04', 'CRITICAL',
+      ent('proc-kafka-infra-03', 'broker-east-04', 'KAFKA_BROKER', 'broker-east-04', 'CRITICAL',
         det('Broker saturated — leader for 3 hot FX-quote topics; throttle under consideration.', 14400000, 'msgs/day', 'WARN_BROKER_PRESSURE_EAST', [
           metric('CPU Utilization', 96, '%', 'CRITICAL'),
           metric('Memory Utilization', 92, '%', 'CRITICAL'),
-        ])),
-      ent('proc-kafka-east-03', 'controller-01', 'CLUSTER_NODE', 'controller-01', 'HEALTHY',
+        ]), {
+          archetype: 'STATISTICAL',
+          metricName: 'broker-east-04 CPU Utilization (%)',
+          currentValue: 96,
+          mean: 74,
+          upperControlLimit: 90,
+          lowerControlLimit: 40,
+          timeSeries: [
+            { timestamp: '12:04', value: 71 },
+            { timestamp: '12:05', value: 78 },
+            { timestamp: '12:06', value: 83 },
+            { timestamp: '12:07', value: 79 },
+            { timestamp: '12:08', value: 88 },
+            { timestamp: '12:09', value: 92 },
+            { timestamp: '12:10', value: 96, isOutlier: true },
+          ],
+        }),
+      ent('proc-kafka-infra-03', 'controller-east-01', 'KAFKA_CONTROLLER', 'controller-east-01', 'HEALTHY',
         det('Controller quorum nominal; no leadership elections pending.', 0, 'elections', undefined, [
           metric('CPU Utilization', 21, '%', 'HEALTHY'),
           metric('Memory Utilization', 34, '%', 'HEALTHY'),
         ])),
-      ent('proc-kafka-east-03', 'controller-02', 'CLUSTER_NODE', 'controller-02', 'HEALTHY',
+      ent('proc-kafka-infra-03', 'broker-eu-01', 'KAFKA_BROKER', 'broker-eu-01', 'WARNING',
+        det('ISR shrink on 2 clearing topics; replica lag above SLO while the EU rebalance drains.', 6100000, 'msgs/day', 'WARN_ISR_SHRINK_EU', [
+          metric('ISR Under-replicated', 42, 'partitions', 'WARNING'),
+          metric('Replica Lag', 940, 'ms', 'WARNING'),
+        ])),
+      ent('proc-kafka-infra-03', 'broker-eu-02', 'KAFKA_BROKER', 'broker-eu-02', 'HEALTHY',
+        det('Broker steady; replica lag nominal.', 0, 'partitions', undefined, [
+          metric('CPU Utilization', 31, '%', 'HEALTHY'),
+          metric('Memory Utilization', 44, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kafka-infra-03', 'broker-eu-03', 'KAFKA_BROKER', 'broker-eu-03', 'CRITICAL',
+        det('Producer p99 stalls on the quote topics; request-queue saturation triggers the throttling plan.', 12200000, 'msgs/day', 'FAIL_PRODUCER_STALL_EU', [
+          metric('CPU Utilization', 97, '%', 'CRITICAL'),
+          metric('Request Handler Idle', 31, '%', 'CRITICAL'),
+        ])),
+      ent('proc-kafka-infra-03', 'controller-eu-01', 'KAFKA_CONTROLLER', 'controller-eu-01', 'HEALTHY',
         det('Controller quorum nominal; no leadership elections pending.', 0, 'elections', undefined, [
-          metric('CPU Utilization', 19, '%', 'HEALTHY'),
-          metric('Memory Utilization', 31, '%', 'HEALTHY'),
+          metric('CPU Utilization', 18, '%', 'HEALTHY'),
+          metric('Memory Utilization', 29, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kafka-infra-03', 'controller-eu-02', 'KAFKA_CONTROLLER', 'controller-eu-02', 'UNKNOWN',
+        det('No heartbeat from this controller since 12:04 — quorum state unverified.', 0, 'elections', 'STALE_CONTROLLER_HEARTBEAT', [
+          metric('Heartbeat Gap', 41, 's', 'UNKNOWN'),
+          metric('Elections Pending', 2, 'elections', 'UNKNOWN'),
         ])),
     ),
     smartLaunchers: [
@@ -641,18 +684,286 @@ export const mockProcessStates: ProcessStatePayload[] = [
         id: 'sl-1',
         label: 'Broker Metrics Wallboard',
         targetTool: 'GRAFANA',
-        url: 'https://grafana.internal/d/kafka-east/cluster-overview',
+        url: 'https://grafana.internal/d/kafka-fleet/cluster-overview',
         parameters: { cluster_id: 'kafka-us-east' },
       },
       {
         id: 'sl-2',
         label: 'Datadog Broker Agents',
         targetTool: 'DATADOG',
-        url: 'https://datadog.internal/dash/kafka-east',
+        url: 'https://datadog.internal/dash/kafka-fleet',
         parameters: { env: 'prod' },
       },
     ],
   },
+  {
+    header: {
+      processId: 'proc-database-infra-04',
+      title: 'Database Infrastructure (Fleet)',
+      ownerTeam: 'Data Platform',
+      updatedAt: new Date().toISOString(),
+      healthState: 'CRITICAL',
+      staleHeartbeatThresholdSeconds: 10,
+    },
+    overview: {
+      heroMetricLabel: 'Replication Lag',
+      heroMetricValue: 41,
+      heroMetricUnit: 's',
+      trend: 'UP',
+    },
+    detail: {
+      narrativeSummary:
+        'Replica lag on two Postgres lanes and an eviction storm in the Redis cache tier; read replicas may serve stale rows.',
+      impactedCount: 18400,
+      impactedUnit: 'stale reads',
+      primaryFailureKey: 'FAIL_EVICT_STORM_CACHE',
+      incidentStartedAt: new Date(Date.now() - 27 * 60 * 1000).toISOString(),
+    },
+    deep: {
+      archetype: 'TOPOLOGY',
+      clusterName: 'Data Tier Mesh — Postgres + Redis + MongoDB',
+      totalNodes: 7,
+      nodes: [
+        { nodeId: 'pg-us-primary', status: 'HEALTHY', cpuUtilizationPct: 38, memoryUtilizationPct: 55, entityId: 'pg-us-primary' },
+        { nodeId: 'pg-us-replica-1', status: 'WARNING', cpuUtilizationPct: 61, memoryUtilizationPct: 88, entityId: 'pg-us-replica-1' },
+        { nodeId: 'pg-eu-primary', status: 'WARNING', cpuUtilizationPct: 55, memoryUtilizationPct: 87, entityId: 'pg-eu-primary' },
+        { nodeId: 'redis-cache-01', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 94, entityId: 'redis-cache-01' },
+        { nodeId: 'redis-cache-02', status: 'HEALTHY', cpuUtilizationPct: 44, memoryUtilizationPct: 49, entityId: 'redis-cache-02' },
+        { nodeId: 'mongo-eu-01', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 61, entityId: 'mongo-eu-01' },
+        { nodeId: 'mongo-eu-02', status: 'UNKNOWN', cpuUtilizationPct: 12, memoryUtilizationPct: 12, entityId: 'mongo-eu-02' },
+      ],
+    },
+    entities: chain(
+      ent('proc-database-infra-04', 'pg-us-primary', 'DATABASE', 'pg-us-primary', 'HEALTHY',
+        det('Primary nominal; WAL writer inside budget.', 0, 'queries', undefined, [
+          metric('Write Latency p99', 4, 'ms', 'HEALTHY'),
+          metric('Connection Saturation', 62, '%', 'HEALTHY'),
+        ])),
+      ent('proc-database-infra-04', 'pg-us-replica-1', 'DATABASE', 'pg-us-replica-1', 'WARNING',
+        det('Replica replay lags the primary by 41 s; stale reads possible on reporting lanes.', 6100, 'stale reads', 'WARN_REPLICA_LAG_US', [
+          metric('Replication Lag', 41, 's', 'WARNING'),
+          metric('Replay Latency', 88, 'ms', 'WARNING'),
+        ])),
+      ent('proc-database-infra-04', 'pg-eu-primary', 'DATABASE', 'pg-eu-primary', 'WARNING',
+        det('Checkpoint stalls on the EU primary; autovacuum debt is accumulating.', 2900, 'stale reads', 'WARN_CHECKPOINT_STALL_EU', [
+          metric('Checkpoint Stall', 6.4, 's', 'WARNING'),
+          metric('Temp File Spill', 2.1, 'GB/min', 'WARNING'),
+        ])),
+      ent('proc-database-infra-04', 'redis-cache-01', 'CACHE', 'redis-cache-01', 'CRITICAL',
+        det('Eviction storm — 2.4% of gets evict; cache hit rate has dropped below the 96% floor.', 9200, 'cache misses', 'FAIL_EVICT_STORM_CACHE', [
+          metric('Eviction Rate', 2.4, '%', 'CRITICAL'),
+          metric('Cache Hit Rate', 93.8, '%', 'CRITICAL'),
+        ]), {
+          archetype: 'STATISTICAL',
+          metricName: 'redis-cache-01 Cache Hit Rate (%)',
+          currentValue: 93.8,
+          mean: 97.2,
+          upperControlLimit: 99,
+          lowerControlLimit: 95,
+          timeSeries: [
+            { timestamp: '12:04', value: 97.4 },
+            { timestamp: '12:05', value: 97.1 },
+            { timestamp: '12:06', value: 96.6 },
+            { timestamp: '12:07', value: 96.2 },
+            { timestamp: '12:08', value: 95.4 },
+            { timestamp: '12:09', value: 94.6 },
+            { timestamp: '12:10', value: 93.8, isOutlier: true },
+          ],
+        }),
+      ent('proc-database-infra-04', 'redis-cache-02', 'CACHE', 'redis-cache-02', 'HEALTHY',
+        det('Cache node nominal; evictions negligible.', 0, 'cache misses', undefined, [
+          metric('Eviction Rate', 0.1, '%', 'HEALTHY'),
+          metric('Cache Hit Rate', 99.1, '%', 'HEALTHY'),
+        ])),
+      ent('proc-database-infra-04', 'mongo-eu-01', 'DATABASE', 'mongo-eu-01', 'CRITICAL',
+        det('Oplog window down to 41 min; secondary risks falling out of the sync window.', 3400, 'documents', 'FAIL_OPLOG_WINDOW', [
+          metric('Oplog Window', 41, 'min', 'CRITICAL'),
+          metric('Sync Lag', 740, 's', 'CRITICAL'),
+        ])),
+      ent('proc-database-infra-04', 'mongo-eu-02', 'DATABASE', 'mongo-eu-02', 'UNKNOWN',
+        det('Hidden member heartbeat missing — sync state unverified.', 0, 'documents', 'STALE_MEMBER_HEARTBEAT', [
+          metric('Heartbeat Gap', 38, 's', 'UNKNOWN'),
+          metric('Sync Lag', 620, 's', 'UNKNOWN'),
+        ])),
+    ),
+    smartLaunchers: [
+      {
+        id: 'sl-1',
+        label: 'Data Tier Wallboard',
+        targetTool: 'GRAFANA',
+        url: 'https://grafana.internal/d/data-tier/fleet',
+        parameters: { tier: 'prod' },
+      },
+      {
+        id: 'sl-2',
+        label: 'PgStatStatements Explorer',
+        targetTool: 'KIBANA',
+        url: 'https://kibana.internal/app/discover#/data-tier/pg',
+      },
+    ],
+  },
+  {
+    header: {
+      processId: 'proc-kubernetes-infra-05',
+      title: 'Kubernetes Infrastructure (Fleet)',
+      ownerTeam: 'Platform SRE',
+      updatedAt: new Date().toISOString(),
+      healthState: 'CRITICAL',
+      staleHeartbeatThresholdSeconds: 10,
+    },
+    overview: {
+      heroMetricLabel: 'Node Memory Pressure',
+      heroMetricValue: 88,
+      heroMetricUnit: '%',
+      trend: 'UP',
+    },
+    detail: {
+      narrativeSummary:
+        'Memory pressure on two worker nodes and etcd disk latency on the EU control plane; API throttling under observation.',
+      impactedCount: 36,
+      impactedUnit: 'pods at risk',
+      primaryFailureKey: 'WARN_NODE_MEM_PRESSURE',
+      incidentStartedAt: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
+    },
+    deep: {
+      archetype: 'TOPOLOGY',
+      clusterName: 'Container Platform Mesh — US-East + EU-West',
+      totalNodes: 6,
+      nodes: [
+        { nodeId: 'node-us-01', status: 'HEALTHY', cpuUtilizationPct: 46, memoryUtilizationPct: 52, entityId: 'node-us-01' },
+        { nodeId: 'node-us-02', status: 'WARNING', cpuUtilizationPct: 78, memoryUtilizationPct: 88, entityId: 'node-us-02' },
+        { nodeId: 'node-us-03', status: 'HEALTHY', cpuUtilizationPct: 33, memoryUtilizationPct: 41, entityId: 'node-us-03' },
+        { nodeId: 'node-eu-01', status: 'WARNING', cpuUtilizationPct: 71, memoryUtilizationPct: 86, entityId: 'node-eu-01' },
+        { nodeId: 'cp-eu-01', status: 'CRITICAL', cpuUtilizationPct: 96, memoryUtilizationPct: 94, entityId: 'cp-eu-01' },
+        { nodeId: 'cp-eu-02', status: 'UNKNOWN', cpuUtilizationPct: 12, memoryUtilizationPct: 18, entityId: 'cp-eu-02' },
+      ],
+    },
+    entities: chain(
+      ent('proc-kubernetes-infra-05', 'node-us-01', 'K8S_NODE', 'node-us-01', 'HEALTHY',
+        det('Worker nominal; pods scheduled within resource budget.', 0, 'pods', undefined, [
+          metric('CPU Utilization', 46, '%', 'HEALTHY'),
+          metric('Memory Utilization', 52, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kubernetes-infra-05', 'node-us-02', 'K8S_NODE', 'node-us-02', 'WARNING',
+        det('Memory pressure; kubelet is evicting best-effort pods.', 14, 'pods', 'WARN_NODE_MEM_PRESSURE', [
+          metric('Memory Utilization', 88, '%', 'WARNING'),
+          metric('Pod Restarts', 7, '/min', 'WARNING'),
+        ])),
+      ent('proc-kubernetes-infra-05', 'node-us-03', 'K8S_NODE', 'node-us-03', 'HEALTHY',
+        det('Worker nominal; no pressure conditions active.', 0, 'pods', undefined, [
+          metric('CPU Utilization', 33, '%', 'HEALTHY'),
+          metric('Memory Utilization', 41, '%', 'HEALTHY'),
+        ])),
+      ent('proc-kubernetes-infra-05', 'node-eu-01', 'K8S_NODE', 'node-eu-01', 'WARNING',
+        det('Memory pressure on the EU worker; pending evictions threaten quote-feed latency budgets.', 22, 'pods', 'WARN_NODE_MEM_PRESSURE', [
+          metric('Memory Utilization', 86, '%', 'WARNING'),
+          metric('Pod Evictions', 3, '/min', 'WARNING'),
+        ])),
+      ent('node-eu-01', 'pod-fx-matcher-throttled', 'WORKLOAD_POD', 'pod-fx-matcher-throttled', 'WARNING',
+        det('Throttled on stale feeds; restart count climbing on memory-constrained worker.', 240, 'quotes', 'WARN_POD_MEM_CONSTRAINED', [
+          metric('Container Memory', 612, 'MiB', 'WARNING'),
+          metric('Throttle Factor', 41, '%', 'WARNING'),
+        ])),
+      ent('proc-kubernetes-infra-05', 'cp-eu-01', 'K8S_CONTROL_PLANE', 'cp-eu-01', 'CRITICAL',
+        det('etcd disk latency above SLO; API server beginning to throttle high-churn LISTs.', 12, 'services', 'FAIL_ETCD_DISK_LATENCY', [
+          metric('etcd Write p99', 41, 'ms', 'CRITICAL'),
+          metric('API 429 Responses', 6, '/min', 'CRITICAL'),
+        ])),
+      ent('proc-kubernetes-infra-05', 'cp-eu-02', 'K8S_CONTROL_PLANE', 'cp-eu-02', 'UNKNOWN',
+        det('Heartbeat missing from second control-plane member; quorum unverified.', 0, 'services', 'STALE_CONTROLPLANE_HEARTBEAT', [
+          metric('Heartbeat Gap', 38, 's', 'UNKNOWN'),
+          metric('Leader Elections Pending', 1, 'elections', 'UNKNOWN'),
+        ])),
+    ),
+    smartLaunchers: [
+      {
+        id: 'sl-1',
+        label: 'Cluster Capacity Board',
+        targetTool: 'GRAFANA',
+        url: 'https://grafana.internal/d/k8s/fleet',
+        parameters: { mesh: 'prod' },
+      },
+      {
+        id: 'sl-2',
+        label: 'Kubelet System Logs',
+        targetTool: 'KIBANA',
+        url: 'https://kibana.internal/app/discover#/k8s/kubelet',
+      },
+    ],
+  },
+  {
+    header: {
+      processId: 'proc-ec2-infra-06',
+      title: 'EC2 Compute (Fleet)',
+      ownerTeam: 'Platform SRE',
+      updatedAt: new Date().toISOString(),
+      healthState: 'CRITICAL',
+      staleHeartbeatThresholdSeconds: 10,
+    },
+    overview: {
+      heroMetricLabel: 'Peak Saturation',
+      heroMetricValue: 4.6,
+      heroMetricUnit: '%',
+      trend: 'DOWN',
+    },
+    detail: {
+      narrativeSummary:
+        'Batch worker ASG pinned in the 4–5% saturation band for the last hour; web-tier headroom shrinking in both regions.',
+      impactedCount: 14200,
+      impactedUnit: 'rows/min stalled',
+      primaryFailureKey: 'FAIL_BATCH_CPU_SATURATION',
+      incidentStartedAt: new Date(Date.now() - 54 * 60 * 1000).toISOString(),
+    },
+    deep: {
+      archetype: 'HEATMAP',
+      metricName: 'CPU saturation % per instance group per 5-min bucket',
+      columns: 12,
+      bucketMinutes: 5,
+      serviceRows: [
+        heatRow('web-us-a', 'Web Tier us-east (ASG)', [0.9, 1.1, 0.8, 1.3, 1.0, 0.9, 1.2, 1.4, 1.1, 0.9, 1.3, 1.6]),
+        heatRow('batch-us-a', 'Batch Workers us-east (ASG)', [2.4, 2.8, 2.1, 3.2, 3.8, 3.1, 4.2, 4.6, 4.1, 3.6, 3.9, 4.4]),
+        heatRow('web-eu-b', 'Web Tier eu-west (ASG)', [1.2, 1.4, 1.1, 1.3, 1.6, 1.2, 1.4, 1.5, 1.3, 1.1, 1.4, 1.6]),
+        heatRow('edge-eu-c', 'Edge NAT eu-west (ASG)', [0.3, 0.2, 0.4, 0.3, 0.2, 0.3, 0.4, 0.2, 0.3, 0.4, 0.2, 0.3]),
+      ],
+    },
+    entities: chain(
+      ent('proc-ec2-infra-06', 'web-us-a', 'EC2_INSTANCE', 'Web Tier us-east (ASG)', 'HEALTHY',
+        det('Web fleet nominal; saturation stays inside budget across every bucket.', 0, 'rows/min stalled', undefined, [
+          metric('Saturation p99', 1.6, '%', 'HEALTHY'),
+          metric('Connection Drain', 12, '/min', 'HEALTHY'),
+        ])),
+      ent('proc-ec2-infra-06', 'batch-us-a', 'EC2_INSTANCE', 'Batch Workers us-east (ASG)', 'CRITICAL',
+        det('Sustained 4–5% saturation band on batch jobs; CPU credits nearly exhausted.', 14200, 'rows/min stalled', 'FAIL_BATCH_CPU_SATURATION', [
+          metric('Saturation p99', 4.6, '%', 'CRITICAL'),
+          metric('CPU Credits Left', 6, '%', 'WARNING'),
+        ])),
+      ent('proc-ec2-infra-06', 'web-eu-b', 'EC2_INSTANCE', 'Web Tier eu-west (ASG)', 'WARNING',
+        det('Mid-band saturation sustained on the EU web tier; headroom shrinking.', 2100, 'rows/min stalled', 'WARN_WEB_HEADROOM_SHRINKING', [
+          metric('Saturation p99', 1.6, '%', 'WARNING'),
+          metric('Connection Drain', 18, '/min', 'WARNING'),
+        ])),
+      ent('proc-ec2-infra-06', 'edge-eu-c', 'EC2_INSTANCE', 'Edge NAT eu-west (ASG)', 'HEALTHY',
+        det('NAT gateways nominal; no port-allocation saturation observed.', 0, 'rows/min stalled', undefined, [
+          metric('Saturation p99', 0.4, '%', 'HEALTHY'),
+        ])),
+    ),
+    smartLaunchers: [
+      {
+        id: 'sl-1',
+        label: 'EC2 Fleet Dashboard',
+        targetTool: 'DATADOG',
+        url: 'https://datadog.internal/dash/ec2-fleet',
+        parameters: { env: 'prod' },
+      },
+      {
+        id: 'sl-2',
+        label: 'CloudWatch CPU Traces',
+        targetTool: 'CUSTOM',
+        url: 'https://cloudwatch.internal/ec2/fleet-cpu',
+      },
+    ],
+  },
+
   {
     header: {
       processId: 'proc-pci-gate-04',
@@ -914,6 +1225,74 @@ export const mockProcessStates: ProcessStatePayload[] = [
   },
 ];
 
+
+// ============================================================================
+// Fleet-wide unhealthy-infra watchlist (computed upstream — Principle 1)
+// ============================================================================
+
+const FLEET_PROCESS_IDS: readonly string[] = [
+  'proc-kafka-infra-03',
+  'proc-database-infra-04',
+  'proc-kubernetes-infra-05',
+  'proc-ec2-infra-06',
+];
+
+/** Triage-list membership: unhealthy means WARNING or CRITICAL (upstream rule). */
+const UNHEALTHY_STATES: readonly HealthState[] = ['CRITICAL', 'WARNING'];
+
+/**
+ * Fleet watchlist builder: collect every WARNING/CRITICAL element across the
+ * four infrastructure envelopes into one cross-type, severity-ordered list.
+ * The UI only ever displays this data — it never derives membership or order.
+ */
+function buildInfraWatch(fleet: ProcessStatePayload[]): InfraWatchEntry[] {
+  const byId = new Map(fleet.map((state) => [state.header.processId, state]));
+  const entries: InfraWatchEntry[] = [];
+  for (const processId of FLEET_PROCESS_IDS) {
+    const envelope = byId.get(processId);
+    if (!envelope?.entities) continue;
+    for (const entity of Object.values(envelope.entities)) {
+      if (!UNHEALTHY_STATES.includes(entity.healthState)) continue;
+      const first = entity.detail.metrics?.[0];
+      entries.push({
+        processId: envelope.header.processId,
+        processTitle: envelope.header.title,
+        entityId: entity.entityId,
+        entityKind: entity.entityKind,
+        health: entity.healthState,
+        hero: {
+          heroMetricLabel: first?.label ?? entity.entityKind,
+          heroMetricValue: first?.value ?? 0,
+          heroMetricUnit: first?.unit,
+          trend: 'STABLE',
+        },
+      });
+    }
+  }
+  const severity = (h: HealthState) => (h === 'CRITICAL' ? 0 : 1);
+  entries.sort(
+    (a, b) =>
+      severity(a.health) - severity(b.health) ||
+      a.processId.localeCompare(b.processId) ||
+      a.entityId.localeCompare(b.entityId),
+  );
+  return entries;
+}
+
+/** Re-stamp: rebuild the fleet watchlist, then stamp a copy into EVERY
+ *  envelope's DetailExtract — so any card's first-page drawer displays the
+ *  same precomputed unhealthy-infrastructure list. */
+function stampFleetWatch(fleet: ProcessStatePayload[]): ProcessStatePayload[] {
+  const watch = buildInfraWatch(fleet);
+  return fleet.map((state) => ({
+    ...state,
+    detail: { ...state.detail, infraWatch: watch.map((entry) => ({ ...entry })) },
+  }));
+}
+
+/** The exported fleet: seeds carry their first upstream-computed watchlist. */
+export const mockProcessStates: ProcessStatePayload[] = stampFleetWatch(SEED_PROCESS_STATES);
+
 /** Back-compat alias: the original single FLOW fixture. */
 export const mockFlowState: ProcessStatePayload = mockProcessStates[0];
 
@@ -948,7 +1327,8 @@ export function createMockStateStream(
   let timer: ReturnType<typeof setInterval> | null = null;
 
   const tick = (): void => {
-    current = current.map(nextMockState);
+    // Fresh envelope drift first, then a fresh fleet-wide watchlist.
+    current = stampFleetWatch(current.map(nextMockState));
     options.onTick(current);
   };
 

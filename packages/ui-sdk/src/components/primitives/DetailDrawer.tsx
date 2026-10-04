@@ -9,10 +9,15 @@
  * When an entity's chain continues (its EnrichedEntity carries its own deep
  * payload), the Shell passes hasDeepView + onOpenDeep and the drawer offers
  * the "go deeper" hop — so chains continue as DATA, never as code branches.
+ *
+ * A process-scale drawer may also carry the fleet-wide unhealthy-infrastructure
+ * watchlist (DetailExtract.infraWatch). It is displayed verbatim — membership
+ * and ordering are computed upstream (Principle 1) — and its rows are drill
+ * affordances into the listed element's own drawer.
  */
 
 import React, { ReactNode } from 'react';
-import { DetailExtract, HealthState } from '../../types';
+import { DetailExtract, HealthState, InfraWatchEntry } from '../../types';
 import { DrawerShell } from './DrawerShell';
 
 const statusFg = (h: HealthState) => `var(--status-${h.toLowerCase()}-fg)`;
@@ -29,6 +34,10 @@ export interface DetailDrawerProps {
   extract: DetailExtract;
   /** Precomputed upstream — displayed, never derived (Principle 1). */
   health: HealthState;
+  /** Fleet-wide unhealthy-infra watchlist — precomputed; displayed verbatim. */
+  infraWatch?: InfraWatchEntry[];
+  /** Drill affordance: open the listed element's own drawer (Shell wires it). */
+  onDrillInfra?: (entry: InfraWatchEntry) => void;
   /** True when this entity's chain continues (custom deep payload exists). */
   hasDeepView?: boolean;
   /** Drill affordance: mount this entity's own deep view. */
@@ -45,6 +54,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
   kindHint,
   extract,
   health,
+  infraWatch,
+  onDrillInfra,
   hasDeepView,
   onOpenDeep,
   launcherSlot,
@@ -85,6 +96,48 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         </span>
         <span className="text-desk-body text-ink-primary">{extract.impactedUnit} impacted</span>
       </section>
+
+      {/* Fleet-wide unhealthy-infra watch — membership + statuses computed
+          upstream; displayed verbatim (Principle 1). Rows drill into the
+          element's own drawer; colors ride the status tokens. */}
+      {infraWatch && infraWatch.length > 0 && (
+        <section aria-label="Unhealthy infrastructure (all types)" data-testid="infra-watch">
+          <h3 className="text-console text-ink-secondary uppercase tracking-wider mb-2">
+            Infrastructure health — all types ({infraWatch.length} unhealthy)
+          </h3>
+          <ul className="flex flex-col gap-1.5 font-mono text-console">
+            {infraWatch.map((entry) => (
+              <li key={`${entry.processId}:${entry.entityId}`}>
+                <button
+                  type="button"
+                  data-testid="infra-watch-row"
+                  data-status={entry.health}
+                  onClick={() => onDrillInfra?.(entry)}
+                  aria-label={`${entry.entityId} — ${entry.health}. Drill into ${entry.entityKind}`}
+                  className="flex w-full cursor-pointer items-baseline justify-between gap-3 rounded px-2 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
+                  style={{
+                    color: statusFg(entry.health),
+                    backgroundColor: statusBg(entry.health),
+                    border: `1px solid ${statusBorder(entry.health)}`,
+                  }}
+                >
+                  <span className="min-w-0 truncate">
+                    {entry.entityId} · {entry.entityKind}
+                    {entry.hero.heroMetricValue !== undefined && (
+                      <span className="text-ink-secondary">
+                        {' — '}
+                        {entry.hero.heroMetricLabel}: {entry.hero.heroMetricValue}
+                        {entry.hero.heroMetricUnit ? ` ${entry.hero.heroMetricUnit}` : ''}
+                      </span>
+                    )}
+                  </span>
+                  <span aria-hidden="true">▸</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Entity-scoped readings — statuses computed upstream, mapped to tokens */}
       {extract.metrics && extract.metrics.length > 0 && (

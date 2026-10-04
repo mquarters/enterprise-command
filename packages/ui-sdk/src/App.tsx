@@ -29,6 +29,7 @@ import {
   DetailExtract,
   EnrichedEntity,
   HealthState,
+  InfraWatchEntry,
   ProcessStatePayload,
 } from './types';
 import { pluginRegistry } from './plugin-registry';
@@ -63,6 +64,8 @@ type FocusedView = {
   health: HealthState;
   extract: DetailExtract;
   deep?: ArchetypePayload;
+  /** Fleet-wide unhealthy-infra watch — precomputed; display-only (P1). */
+  watch?: InfraWatchEntry[];
 };
 
 const TICK_INTERVAL_MS = 2500;
@@ -92,6 +95,7 @@ function focusFrame(
       health: state.header.healthState,
       extract: state.detail,
       deep: state.deep,
+      watch: state.detail.infraWatch,
     };
   }
   const entity = state.entities?.[frame.target.entityId];
@@ -427,6 +431,12 @@ function Shell() {
             kindHint={current.kindHint}
             extract={current.extract}
             health={current.health}
+            infraWatch={trail.length === 1 ? current.watch : undefined}
+            onDrillInfra={
+              trail.length === 1
+                ? (entry) => drillInto({ processId: entry.processId, entityId: entry.entityId })
+                : undefined
+            }
             hasDeepView={Boolean(current.deep)}
             onOpenDeep={goDeeper}
             onBack={goBack}

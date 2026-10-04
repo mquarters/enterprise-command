@@ -66,6 +66,28 @@ export interface DetailExtract {
   incidentStartedAt?: string;
   /** Entity-scoped readings (queue depth, oldest-message age, …). */
   metrics?: MetricReading[];
+  /**
+   * Fleet-wide unhealthy-infrastructure watchlist (WARNING/CRITICAL only),
+   * computed upstream by the state engine and recomputed every tick.
+   * Displayed verbatim by process-scale drawers; drill rows resolve through
+   * the Shell's context-path guards (Principle 1 — never derived in the UI).
+   */
+  infraWatch?: InfraWatchEntry[];
+}
+
+/** One unhealthy-infra element listed by the fleet-wide triage watchlist. */
+export interface InfraWatchEntry {
+  /** Envelope owning the element — resolution key, not a display hint. */
+  processId: string;
+  /** Title of that envelope (display hint on the triage row). */
+  processTitle: string;
+  /** The unhealthy element itself (its entityKind stays a display hint). */
+  entityId: string;
+  entityKind: string;
+  /** Precomputed upstream — drives only the triage-row chip. */
+  health: HealthState;
+  /** Hero reading shown verbatim on the triage row (display-only). */
+  hero: OverviewExtract;
 }
 
 /** Deep links generated for third-party external tools */
