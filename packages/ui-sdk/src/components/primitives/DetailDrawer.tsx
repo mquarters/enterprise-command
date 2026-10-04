@@ -135,7 +135,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   <span className="min-w-0 truncate">{group.groupLabel}</span>
                   <span aria-hidden="true">▸</span>
                 </button>
-                <ul className="flex flex-col gap-1.5 font-mono text-console">
+                <ul className="ml-3 flex flex-col gap-1.5 font-mono text-console">
                   {group.members.length === 0 ? (
                     <li className="px-2 py-1 rounded text-ink-secondary">All member nodes healthy.</li>
                   ) : (
@@ -147,24 +147,21 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                           data-status={entry.health}
                           onClick={() => onDrillInfra?.(entry)}
                           aria-label={`${entry.entityId} — ${entry.health}. Drill into ${entry.entityKind}`}
-                          className="flex w-full cursor-pointer items-baseline justify-between gap-3 rounded px-2 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
-                          style={{
-                            color: statusFg(entry.health),
-                            backgroundColor: statusBg(entry.health),
-                            border: `1px solid ${statusBorder(entry.health)}`,
-                          }}
+                          className="flex w-full cursor-pointer items-baseline justify-between gap-3 rounded border-l-2 pl-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
+                          style={{ borderLeftColor: statusBorder(entry.health) }}
                         >
-                          <span className="min-w-0 truncate">
+                          <span className="min-w-0 truncate text-ink-primary">
                             {entry.entityId} · {entry.entityKind}
-                            {entry.hero.heroMetricValue !== undefined && (
-                              <span className="text-ink-secondary">
-                                {' — '}
-                                {entry.hero.heroMetricLabel}: {entry.hero.heroMetricValue}
-                                {entry.hero.heroMetricUnit ? ` ${entry.hero.heroMetricUnit}` : ''}
-                              </span>
-                            )}
                           </span>
-                          <span aria-hidden="true">▸</span>
+                          {entry.hero.heroMetricValue !== undefined && (
+                            <span
+                              className="shrink-0"
+                              style={{ color: statusFg(entry.health) }}
+                            >
+                              {entry.hero.heroMetricLabel}: {entry.hero.heroMetricValue}
+                              {entry.hero.heroMetricUnit ? ` ${entry.hero.heroMetricUnit}` : ''}
+                            </span>
+                          )}
                         </button>
                       </li>
                     ))
@@ -190,24 +187,21 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                     data-status={entry.health}
                     onClick={() => onDrillInfra?.(entry)}
                     aria-label={`${entry.entityId} — ${entry.health}. Drill into ${entry.entityKind}`}
-                    className="flex w-full cursor-pointer items-baseline justify-between gap-3 rounded px-2 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
-                    style={{
-                      color: statusFg(entry.health),
-                      backgroundColor: statusBg(entry.health),
-                      border: `1px solid ${statusBorder(entry.health)}`,
-                    }}
+                    className="flex w-full cursor-pointer items-baseline justify-between gap-3 rounded border-l-2 pl-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
+                    style={{ borderLeftColor: statusBorder(entry.health) }}
                   >
-                    <span className="min-w-0 truncate">
+                    <span className="min-w-0 truncate text-ink-primary">
                       {entry.entityId} · {entry.entityKind}
-                      {entry.hero.heroMetricValue !== undefined && (
-                        <span className="text-ink-secondary">
-                          {' — '}
-                          {entry.hero.heroMetricLabel}: {entry.hero.heroMetricValue}
-                          {entry.hero.heroMetricUnit ? ` ${entry.hero.heroMetricUnit}` : ''}
-                        </span>
-                      )}
                     </span>
-                    <span aria-hidden="true">▸</span>
+                    {entry.hero.heroMetricValue !== undefined && (
+                      <span
+                        className="shrink-0"
+                        style={{ color: statusFg(entry.health) }}
+                      >
+                        {entry.hero.heroMetricLabel}: {entry.hero.heroMetricValue}
+                        {entry.hero.heroMetricUnit ? ` ${entry.hero.heroMetricUnit}` : ''}
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
@@ -246,7 +240,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
         </section>
       )}
 
-      <footer className="mt-auto pt-4 border-t border-border-subtle flex flex-col gap-3">
+      <footer className="sticky bottom-0 mt-auto flex flex-col gap-3 border-t border-border-subtle bg-surface-overlay pt-4">
         {hasDeepView && onOpenDeep && (
           <button
             type="button"

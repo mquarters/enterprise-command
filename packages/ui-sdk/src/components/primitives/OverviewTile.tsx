@@ -77,7 +77,7 @@ export const OverviewTile: React.FC<OverviewTileProps> = ({
         data-stale={stale ? 'true' : undefined}
         onClick={() => onSelect?.(entityKey)}
         aria-label={`${entityLabel} — ${health}${heroText ? `. ${heroText}` : ''}`}
-        className="flow-node shadow-lg flex min-w-[10rem] cursor-pointer flex-col justify-between gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
+        className="flow-node flex cursor-pointer flex-col justify-between gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-secondary"
         style={{
           opacity: stale ? 0.35 : 1,
           filter: stale ? 'grayscale(0.9)' : undefined,
@@ -113,7 +113,7 @@ export const OverviewTile: React.FC<OverviewTileProps> = ({
       {/* Identity row: title + health chip + trend glyph */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-tv-title font-bold truncate">{entityLabel}</h2>
+          <h2 className="text-tv-title font-bold break-words">{entityLabel}</h2>
           {subtitle && <p className="text-tv-sub text-ink-secondary">{subtitle}</p>}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">

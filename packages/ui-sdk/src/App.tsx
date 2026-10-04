@@ -239,7 +239,7 @@ function Shell() {
   // ------------------------------------------------------------------
 
   const grid = (
-    <main className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="wall-grid">
+    <main className="grid wall-grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4" data-testid="wall-grid">
       {pluginRegistry.getAll().map((manifest) => {
         const state = states[manifest.processId];
         if (!state) return null;
@@ -419,7 +419,7 @@ function Shell() {
             parent &&
             parentView?.deep && (
               <main
-                className="max-w-6xl pointer-events-none select-none opacity-40"
+                className="max-w-6xl inert-copy pointer-events-none select-none"
                 aria-hidden="true"
               >
                 <ArchetypeCanvas

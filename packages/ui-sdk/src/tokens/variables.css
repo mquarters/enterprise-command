@@ -21,7 +21,22 @@
   --text-primary: #f1f5f9;       /* Primary values, titles, body on card surfaces */
   --text-secondary: #94a3b8;     /* Labels, secondary values */
   --text-muted: #64748b;         /* De-emphasized captions, legend text */
-  --scrim: rgba(2, 6, 23, 0.6);  /* Drawer overlay scrim */
+  --scrim: rgba(2, 6, 23, 0.45); /* Drawer overlay scrim (lightened so inert copy under it stays readable) */
+
+  /* -- Non-semantic chart/connector hues (audit M3: charts must not borrow status-* tokens) -- */
+  --flow-edge-active: #2dd4bf;      /* active connector — data flow, NOT a health state */
+
+  /* -- Radius scale (audit T12/M1: one source instead of ad-hoc literals) -- */
+  --radius-wall: 1rem;              /* L1 wall tiles */
+  --radius-card: 0.5rem;            /* canvas cards + flow nodes */
+  --radius-pill: 0.375rem;          /* pills, narrative band, launcher buttons */
+
+  /* -- Sizing scale (audit V10/V28/V38: fixed heights must have a TV-scale counterpart) -- */
+  --chart-h: 10rem;                 /* sparkline box, desk scale */
+  --chart-h-tv: 16rem;              /* sparkline box when projected on a wall (≥1280px) */
+
+  /* -- Inert-copy contrast (audit V6/V18/V42/V46: dimmed page copy behind the drawer) -- */
+  --inert-copy-opacity: 0.62;       /* opacity of aria-hidden backdrop copy */
 
   /* -- Drawer geometry (single source; no hard-coded z/width in components) -- */
   --z-drawer: 900;               /* process-scale drawer layer */
@@ -55,7 +70,6 @@
   --status-unknown-fg: #94a3b8;
   --status-unknown-bg: rgba(30, 41, 59, 0.5);
   --status-unknown-border: #64748b;
-  --status-unknown-glow: rgba(100, 116, 139, 0.2);
 
   /* ==========================================================================
      3. DISTANCE-BASED TYPOGRAPHY SCALE
@@ -84,14 +98,9 @@
     border-color: var(--status-critical-border);
   }
   50% {
-    box-shadow: 0 0 35px var(--status-critical-glow), inset 0 0 15px rgba(239, 68, 68, 0.3);
-    border-color: #fca5a5;
+    box-shadow: 0 0 35px var(--status-critical-glow), inset 0 0 15px var(--status-critical-glow);
+    border-color: var(--status-critical-border);
   }
-}
-
-@keyframes flow-line-active {
-  0% { stroke-dashoffset: 24; }
-  100% { stroke-dashoffset: 0; }
 }
 
 .animate-critical-pulse {

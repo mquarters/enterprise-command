@@ -63,7 +63,7 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
               {linked && onSelectEntity ? (
                 <button
                   type="button"
-                  className="flow-node shadow-lg flex flex-col justify-between cursor-pointer"
+                  className="flow-node flex flex-col justify-between cursor-pointer"
                   data-entity={linked}
                   data-status={node.status}
                   onClick={() => onSelectEntity(linked)}
@@ -72,7 +72,7 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
                 </button>
               ) : (
                 <div
-                  className="flow-node shadow-lg flex flex-col justify-between"
+                  className="flow-node flex flex-col justify-between"
                   data-status={node.status}
                 >
                   {nodeBody}
@@ -82,7 +82,7 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
               {/* Connector Arrow / Edge */}
               {index < data.nodes.length - 1 && (
                 <div className="flex items-center text-ink-muted font-mono">
-                  <span className={outgoingEdge?.active ? 'text-status-healthy-fg animate-pulse' : ''}>
+                  <span className={outgoingEdge?.active ? 'text-edge-active animate-pulse' : ''}>
                     ──►
                   </span>
                 </div>
@@ -97,9 +97,9 @@ export const FlowArchetype: React.FC<FlowArchetypeProps> = ({
         <div className="pt-4 border-t border-border-subtle flex justify-end">
           <button
             onClick={() => onExecuteMitigation('RETRY_FAILED_STEP')}
-            className="smart-launcher-button bg-status-critical-bg text-status-critical-fg border-status-critical-border hover:brightness-125"
+            className="mitigation-button"
           >
-            ⚡ Trigger Automatic Retry / Bypass
+            Trigger Automatic Retry / Bypass
           </button>
         </div>
       )}

@@ -224,15 +224,29 @@ const metric = (
   status: HealthState = 'HEALTHY'
 ): MetricReading => ({ label, value, unit, status });
 
+/** Seed-authoring helper: when upstream marks an entity degraded, the
+ * incident is ACTIVE from the mock's point of view — give it a start time so
+ * the drawer footer never contradicts the health it displays (audit V22). */
+const seedIncidentStart = (health: 'CRITICAL' | 'WARNING' | 'UNKNOWN') =>
+  new Date(Date.now() - (health === 'CRITICAL' ? 24 : 31) * 60 * 1000).toISOString();
+
 /** Detail-extract builder (seed-authoring shorthand). */
 function det(
   narrativeSummary: string,
   impactedCount: number,
   impactedUnit: string,
   primaryFailureKey?: string,
-  metrics?: MetricReading[]
+  metrics?: MetricReading[],
+  incidentStartedAt?: string
 ): DetailExtract {
-  return { narrativeSummary, impactedCount, impactedUnit, primaryFailureKey, metrics };
+  return {
+    narrativeSummary,
+    impactedCount,
+    impactedUnit,
+    primaryFailureKey,
+    metrics,
+    ...(incidentStartedAt ? { incidentStartedAt } : {}),
+  };
 }
 
 /** Roll-up of a DetailExtract's metric readings (used for seeded entities
@@ -523,7 +537,8 @@ function infraMemberEntity(groupId: string, seed: InfraMemberSeed): EnrichedEnti
       [
         metric(`${id} CPU`, cpu, '%', health),
         metric(`${id} Memory`, mem, '%', health),
-      ]
+      ],
+      health === 'HEALTHY' ? undefined : seedIncidentStart(health)
     )
   );
 }
@@ -537,14 +552,20 @@ function infraGroupEntity(
   detail: DetailExtract,
   deep?: ArchetypePayload
 ): EnrichedEntity {
+  const healthState = rollupHealth(members.map((m) => m.healthState));
   return {
     entityId: groupId,
     parentId: 'proc-infra-03',
     entityKind: INFRA_GROUP_KIND,
     label,
     depth: 2,
-    healthState: rollupHealth(members.map((m) => m.healthState)),
-    detail,
+    healthState,
+    // A degraded group IS an active incident upstream — the footer line must
+    // not contradict the rollup it displays (audit V22).
+    detail:
+      healthState === 'HEALTHY'
+        ? detail
+        : { ...detail, incidentStartedAt: seedIncidentStart(healthState) },
     deep,
   };
 }

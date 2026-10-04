@@ -63,9 +63,9 @@ export const RuleGateArchetype: React.FC<RuleGateArchetypeProps> = ({
         <div className="mt-4 pt-4 border-t border-border-subtle flex justify-end">
           <button
             onClick={() => onExecuteMitigation('OVERRIDE_POLICY_GATE', { policyId: data.policyId })}
-            className="smart-launcher-button"
+            className="mitigation-button"
           >
-            🛡️ Request Manager Policy Override
+            Request Manager Policy Override
           </button>
         </div>
       )}

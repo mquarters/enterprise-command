@@ -29,8 +29,8 @@ export const StatArchetype: React.FC<StatisticalArchetypeProps> = ({
         <div>LCL: <span className="text-status-warning-fg font-mono">{data.lowerControlLimit}</span></div>
       </div>
 
-      {/* SVG Time Series Sparkline with Outliers */}
-      <div className="h-40 w-full relative">
+      {/* SVG Time Series Sparkline with Outliers — box height scales with the wall (M1/M2) */}
+      <div className="h-chart xl:h-chart-tv w-full relative">
         <svg className="w-full h-full overflow-visible" viewBox="0 0 500 120">
           {/* Upper Control Limit Line */}
           <line x1="0" y1="20" x2="500" y2="20" className="stat-control-limit" />

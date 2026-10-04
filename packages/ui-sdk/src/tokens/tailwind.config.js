@@ -18,6 +18,10 @@ module.exports = {
           muted: 'var(--text-muted)',
         },
         scrim: 'var(--scrim)',
+        edge: {
+          // Non-semantic connector hue (audit M3): active flow ≠ healthy.
+          active: 'var(--flow-edge-active)',
+        },
         // Named border colors: makes `border-border-subtle` / `border-border-strong`
         // resolve to real values instead of falling back to preflight's #e5e7eb.
         border: {
@@ -64,6 +68,10 @@ module.exports = {
         'glow-warning': '0 0 20px var(--status-warning-glow)',
         'glow-healthy': '0 0 15px var(--status-healthy-glow)',
         'drawer': 'var(--shadow-drawer)',
+      },
+      height: {
+        'chart': 'var(--chart-h)',
+        'chart-tv': 'var(--chart-h-tv)',
       },
       zIndex: {
         'drawer': 'var(--z-drawer)',
