@@ -28,7 +28,7 @@ specs) before building components. For vocabulary and page surfaces, also read
 
 ## Commands (from the repo root)
 
-- `npm run dev` starts Vite (config: `packages/ui-sdk/vite.config.ts`, which
+- `npm run dev` starts Vite (config: `packages/ui-sdk/vite.config.mts`, which
   enables `@vitejs/plugin-react` and dedupes react/react-dom). It serves on
   http://localhost:5173 (it picks the next port if that one is taken; read the log).
 - `npm run typecheck` runs `tsc --noEmit`. Run it before saying a change is done.
@@ -71,4 +71,5 @@ Chromium and its headless shell are already installed. If launch fails with
   L3 (SRE workbench). Keep L1 legible on a wall display.
 - Components take the enriched polymorphic payload as props. They do not compute health
   or blast radius themselves.
-- Don't commit `dist/`, `node_modules/` or `.env`.
+- Don't commit `dist/`, `node_modules/`, `.env*`, `.pi/` (agent state), `scratch.txt`,
+  or `docs/assets/` (screenshot evidence — regenerated locally, not shipped).

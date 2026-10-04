@@ -15,7 +15,8 @@ observability surfaces that stay legible from three viewing distances — the **
   distance-based type scale, geometry), `domain-component.css` (component classes), and
   `tailwind.config.js` (token → Tailwind mappings).
 - `docs/` — the viewing-model field guide, the terminology glossary, and the design-system audit
-  (`docs/design-system-audit.md` with its before/after screenshot evidence in `docs/assets/audit/`).
+  (`docs/design-system-audit.md`). Its before/after screenshot evidence under
+  `docs/assets/audit/` is git-ignored and regenerated locally — the audit text is the deliverable.
 
 ## Quick start
 
@@ -45,5 +46,5 @@ depth-cap budget). Read `AGENTS.md`, `docs/terminology.md`, and
 - Use design **tokens** (`tokens/`), not raw colors or ad-hoc geometry. The token audit
   (`docs/design-system-audit.md`) lists what each token is for and what the system cannot
   express yet.
-- `dist/`, `node_modules/`, `.env`, `.pi/` (agent state), and `scratch.txt` are git-ignored
-  on purpose.
+- `dist/`, `node_modules/`, `.env*`, `.pi/` (agent state), `scratch.txt`, and
+  `docs/assets/` (screenshot evidence) are git-ignored on purpose.
