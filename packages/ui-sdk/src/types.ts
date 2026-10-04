@@ -67,12 +67,40 @@ export interface DetailExtract {
   /** Entity-scoped readings (queue depth, oldest-message age, …). */
   metrics?: MetricReading[];
   /**
-   * Fleet-wide unhealthy-infrastructure watchlist (WARNING/CRITICAL only),
-   * computed upstream by the state engine and recomputed every tick.
-   * Displayed verbatim by process-scale drawers; drill rows resolve through
-   * the Shell's context-path guards (Principle 1 — never derived in the UI).
+   * Fleet-wide unhealthy-infrastructure watchlist (WARNING/CRITICAL member
+   * nodes only), computed upstream by the state engine and recomputed every
+   * tick. Displayed verbatim by process-scale drawers; drill rows resolve
+   * through the Shell's context-path guards (Principle 1 — never derived in
+   * the UI). Inside the Infrastructure envelope's own drawer this list is
+   * rendered as one section per infrastructure group (see InfraGroupExcerpt).
    */
   infraWatch?: InfraWatchEntry[];
+  /**
+   * Infrastructure-group partition of infraWatch (group → member nodes),
+   * computed upstream and recomputed every tick. Present only on
+   * infrastructure-scale DetailExtracts; rendered verbatim, one section per
+   * group (Principle 1).
+   */
+  infraGroups?: InfraGroupExcerpt[];
+}
+
+/**
+ * One infrastructure group (Kafka, EC2, Kubernetes, Data Databases) with its
+ * unhealthy member nodes — computed upstream from the Infrastructure
+ * envelope's live data, displayed verbatim by the Infrastructure drawers.
+ * groupId doubles as the drill key into the group's own EnrichedEntity.
+ */
+export interface InfraGroupExcerpt {
+  /** Envelope owning the group — resolution key, not a display hint. */
+  processId: string;
+  /** Infrastructure group (INFRA_GROUP sub-entity id). */
+  groupId: string;
+  /** Group display label, e.g. "Message Broker Mesh (Kafka)". */
+  groupLabel: string;
+  /** Precomputed group rollup — drives the group section's chip only. */
+  groupHealth: HealthState;
+  /** Members currently WARNING/CRITICAL in this group (may be empty). */
+  members: InfraWatchEntry[];
 }
 
 /** One unhealthy-infra element listed by the fleet-wide triage watchlist. */
@@ -81,6 +109,8 @@ export interface InfraWatchEntry {
   processId: string;
   /** Title of that envelope (display hint on the triage row). */
   processTitle: string;
+  /** Infrastructure group owning the element (InfraGroupExcerpt.groupId). */
+  groupId?: string;
   /** The unhealthy element itself (its entityKind stays a display hint). */
   entityId: string;
   entityKind: string;
@@ -140,22 +170,47 @@ export interface StatisticalArchetypePayload {
   }>;
 }
 
+/** One cell of a topology payload — one live instance per mirrored entity. */
+export interface TopologyArchetypeNode {
+  nodeId: string;
+  status: HealthState;
+  cpuUtilizationPct: number;
+  memoryUtilizationPct: number;
+  /**
+   * Display link to the EnrichedEntity this node chip mirrors (same
+   * broker/service, same id). Seed data + nav affordance only — never a
+   * health source.
+   */
+  entityId?: string;
+}
+
+/** Optional group partition of a topology payload (Infrastructure Fleet):
+ * one grid per infrastructure group, so one canvas can show every group's
+ * nodes and statuses at a glance. groupId mirrors the group's own
+ * EnrichedEntity (seed data + nav affordance only — never a health source),
+ * which both makes the section title the group's ONE live instance on the
+ * page and suppresses its duplicate chip via the mirrored-children rule. */
+export interface TopologyGrid {
+  groupName: string;
+  groupId?: string;
+  nodes: TopologyArchetypeNode[];
+}
+
+/** Edge between two nodes of a topology payload (e.g. group → member). */
+export interface TopologyEdge {
+  source: string;
+  target: string;
+  active: boolean;
+}
+
 /** Archetype 3: Topology Mesh & Cluster Data */
 export interface TopologyArchetypePayload {
   archetype: 'TOPOLOGY';
   clusterName: string;
   totalNodes: number;
-  nodes: Array<{
-    nodeId: string;
-    status: HealthState;
-    cpuUtilizationPct: number;
-    memoryUtilizationPct: number;
-    /**
-     * Display link to the EnrichedEntity this node chip mirrors (same
-     * broker/service, same id). Seed data + nav affordance only.
-     */
-    entityId?: string;
-  }>;
+  nodes: TopologyArchetypeNode[];
+  grids?: TopologyGrid[];
+  edges?: TopologyEdge[];
 }
 
 /** Archetype 4: Business Rule & Policy Gate Data */
@@ -215,7 +270,9 @@ export interface ProcessStateHeader {
 /**
  * A drillable entity nested inside a process envelope. Carries its own chain:
  * `detail` (its drawer content) and optionally `deep` (its own custom deep
- * view) — so chains continue or terminate as DATA, not code. Keys inside
+ * view) — so chains continue or terminate as DATA, not code. The Shell
+ * refuses any drill that would push the context path beyond DEPTH_CAP
+ * frames, so chains must stay reachable within the cap. Keys inside
  * ProcessStatePayload.entities are entityIds; parentId points at the owning
  * process (depth 2) or at another entity's entityId (depth 3).
  */

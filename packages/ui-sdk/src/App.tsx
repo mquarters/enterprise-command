@@ -29,6 +29,7 @@ import {
   DetailExtract,
   EnrichedEntity,
   HealthState,
+  InfraGroupExcerpt,
   InfraWatchEntry,
   ProcessStatePayload,
 } from './types';
@@ -66,6 +67,8 @@ type FocusedView = {
   deep?: ArchetypePayload;
   /** Fleet-wide unhealthy-infra watch — precomputed; display-only (P1). */
   watch?: InfraWatchEntry[];
+  /** Group partition of that watch — precomputed; display-only (P1). */
+  groups?: InfraGroupExcerpt[];
 };
 
 const TICK_INTERVAL_MS = 2500;
@@ -96,6 +99,7 @@ function focusFrame(
       extract: state.detail,
       deep: state.deep,
       watch: state.detail.infraWatch,
+      groups: state.detail.infraGroups,
     };
   }
   const entity = state.entities?.[frame.target.entityId];
@@ -264,18 +268,24 @@ function Shell() {
   /**
    * Children already mirrored by a linked canvas node (generic keyed
    * lookup — no archetype names). Mirrored members keep exactly one live
-   * affordance: the canvas node itself, so the chip strip yields to it.
-   * Unmirrored children (rule gates, heat rows, observations…) stay
+   * affordance: the canvas instance itself, so the chip strip yields to it
+   * (button → entity drawer; nav affordance only, colors stay upstream).
+   * Topology grids mirror BOTH their keyed group (groupId — the container
+   * one scale above) and their member nodes (entityId links).
+   * Unmirrored drillables (rule gates, heat rows, observations…) stay
    * chip-drillable — no entity ever loses its only drill path.
    */
   const deepPayload = current?.deep;
-  const mirroredIds = new Set<string>(
-    deepPayload && 'nodes' in deepPayload
-      ? [...deepPayload.nodes]
-          .map((node) => node.entityId)
-          .filter((id): id is string => id !== undefined)
-      : []
-  );
+  const mirroredIds = new Set<string>();
+  if (deepPayload && 'nodes' in deepPayload) {
+    for (const node of deepPayload.nodes) if (node.entityId) mirroredIds.add(node.entityId);
+  }
+  if (deepPayload && deepPayload.archetype === 'TOPOLOGY') {
+    for (const grid of deepPayload.grids ?? []) {
+      if (grid.groupId) mirroredIds.add(grid.groupId);
+      for (const node of grid.nodes) if (node.entityId) mirroredIds.add(node.entityId);
+    }
+  }
   const drillChildren = topChildren.filter((child) => !mirroredIds.has(child.entityId));
 
   const childDrills = (
@@ -432,9 +442,15 @@ function Shell() {
             extract={current.extract}
             health={current.health}
             infraWatch={trail.length === 1 ? current.watch : undefined}
+            infraGroups={trail.length === 1 ? current.groups : undefined}
             onDrillInfra={
               trail.length === 1
                 ? (entry) => drillInto({ processId: entry.processId, entityId: entry.entityId })
+                : undefined
+            }
+            onDrillGroup={
+              trail.length === 1
+                ? (group) => drillInto({ processId: group.processId, entityId: group.groupId })
                 : undefined
             }
             hasDeepView={Boolean(current.deep)}
