@@ -28,7 +28,29 @@ mocks layer are reusable assets, not sacred).*
 Each phase ends with: DOM probes (clip checks), full Playwright sweep at the viewports
 named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
 
+### P0 — Mockup gate (before any phase builds its surfaces) [W9, W10, W11]
+- **Rule**: no phase starts building a surface until that surface exists as a MOCK PAGE:
+  a disposable static page (HTML or spike-grade TSX on the scratch branch, never main)
+  rendering the proposed layout with real `processStateMocks` data, screenshot at every
+target viewport, and ANNOTATED with red-outline callouts naming what each region does
+(precedent: `docs/assets/workbench-page-annotated.png`).
+- **Required mockups (minimum)**: (1) Shell/wall with the search bar docked into the
+  header band — proves the F1 vertical-budget fix and the main~70%/aux~30% split before
+  any grid reflow code exists; (2) workbench with the queue rail docked as the secondary
+  zone — proves the F3 dead-band resolution and the right-placed legends; (3) one
+  mobile-tier page at 390×844 walking search → result → act operably; (4) the two spike
+  fragments rescored against the tightened W-tests (recalculated chips; no-re-query act
+  context).
+- **Gate**: mockups are scored pass/partial/fail per W-code (method §3) and reviewed by
+  the human before the building phase opens. A phase that skips mockup review is not
+  "faster" — it is out of process, and its screenshots are inadmissible as acceptance
+  evidence.
+- **Why**: every audit-era visual defect (truncation, dead space, below-fold footer,
+  mixed conventions) was visible on a static page BEFORE code — and was only caught
+  after code. The mock page is where a layout decision is cheapest to kill.
+
 ### P1 — Discovery spine (search → filter chips → results) [W2, W3, W9]
+- **Opens with**: P0 mockups (1) and (3) reviewed and scored.
 - **Build**: global search bar (Shell header, top-left reading axis) parsing Boolean grammar
   (`status:CRITICAL AND dataset:infra-03 AND kind:cluster`); query-scoped filter chips
   (chips *modify results*, unlike navigation chips) whose offered refinements are
@@ -46,6 +68,7 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
   no-match feedback exist (audit R4 pattern); zero second live instance.
 
 ### P2 — Act loop (queue + action overlay + feedback) [W1, W6, W10]
+- **Opens with**: P0 mockup (2) — and mockup (4)'s rescored spike fragments — reviewed and scored.
 - **Build**: work-queue rail (persistent context panel, secondary zone per W9) holding
   task records with upstream-computed state `new → acknowledged → mitigating → resolved`;
   mitigation controls (FLOW/RULE_GATE) and drawer act controls dispatch *into* the queue —
@@ -116,6 +139,9 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
 - **Method**: prototype in place (not production-grade), screenshot-verify at 1920×1080 +
   1440×900 with 0 console errors, score against W-codes; findings feed the plan revision —
   the spikes prove the plan's riskiest assumptions, they do not pre-build the conversion.
+  (Spikes proved INTERACTION SHAPE; P0 mock pages prove PAGE-LAYOUT — complements, not
+  substitutes: the queue-rail fragment worked in Spike B yet sat in a dead band the P0
+  mockup for its page would have shown.)
 
 ## 5.5 Spike findings (evidence from the throwaway branch, not commitments)
 
