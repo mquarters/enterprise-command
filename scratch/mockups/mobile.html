@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P0-M3 Mobile tier (throwaway mockup, walkable)</title>
+<link rel="stylesheet" href="../../packages/ui-sdk/src/tokens/variables.css">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--surface-base); color: var(--text-primary); font: 400 13px/1.4 ui-sans-serif, system-ui; width: 390px; height: 844px; overflow: hidden; margin: 0 auto; }
+  .mono { font-family: ui-monospace, monospace; }
+  #head { display: flex; justify-content: space-between; padding: .6rem .7rem; border-bottom: 1px solid var(--border-subtle); }
+  #searchrow { display: flex; gap: .35rem; padding: .5rem .7rem; border-bottom: 1px solid var(--border-subtle); }
+  #q { flex: 1; background: var(--surface-overlay); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: .45rem .5rem; font-size: 13px; }
+  #chips { display: flex; gap: .3rem; padding: .4rem .7rem; flex-wrap: wrap; }
+  .fchip { padding: .15rem .45rem; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); font-size: 11px; cursor: pointer; }
+  #list { overflow-y: auto; padding: .4rem .7rem; }
+  .row { display: flex; justify-content: space-between; gap: .4rem; padding: .5rem; background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); margin-bottom: .4rem; cursor: pointer; }
+  .row .l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .v { white-space: nowrap; color: var(--text-secondary); }
+  #detail { border-top: 1px solid var(--border-subtle); padding: .5rem .7rem; }
+  #detail .act { margin-top: .35rem; display: block; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); color: var(--text-primary); padding: .35rem .6rem; font-size: 12px; cursor: pointer; }
+  #queue { border-top: 1px solid var(--border-subtle); padding: .45rem .7rem; font-size: 11.5px; color: var(--text-secondary); }
+</style>
+</head>
+<body data-region="MOBILE PAGE (390×844) — search → result → act walkable; one live instance per entity kept (results deep-link)">
+  <div id="head" data-region="Compact header — no wall grid on mobile; awareness = search + queue peek"><strong>VANTAGE // CC</strong><span class="mono" style="color:var(--status-critical-fg)">● LIVE · QUEUE 3</span></div>
+  <div id="searchrow" data-region="Mobile search (same query grammar as desktop)">
+    <input id="q" class="mono" data-region="Mobile query input (walk step 1)" placeholder="status:CRITICAL" autocomplete="off">
+    <button class="mono" style="background:var(--surface-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-pill);color:var(--text-primary);padding:.4rem" id="run">GO</button>
+  </div>
+  <div id="chips" data-region="Recalculated filter chips (mobile tier carries W2 semantics)"></div>
+  <div id="list" data-region="Result list — full-width rows, no truncation (V4/V27 test at mobile width)"></div>
+  <div id="detail" data-region="Act sheet (walk step 3) — act control + inline feedback"><em style="color:var(--text-muted)">Tap a result to open its act sheet (walk step 2 → 3).</em></div>
+  <div id="queue" class="mono" data-region="Queue peek — acts persist here without reload">WORK QUEUE: Retry failed settlement batches (NEW) · Drain hot Kafka partitions (ACK) · Review latency alert (MITIGATING)</div>
+<script src="mock-data.js"></script>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const run = () => {
+    const q = $('#q').value.trim() || 'status:CRITICAL';
+    const hits = MOCK.corpus.filter((r) => r.health === 'CRITICAL' && q.toLowerCase().includes('status:critical') || q.toLowerCase().split(/\s+/).some((t) => t && (r.label + r.ds + r.kind).toLowerCase().includes(t)));
+    $('#chips').innerHTML = ['status:CRITICAL', 'kind:' + 'INFRA_MEMBER', 'kind:FLOW_NODE'].filter((c) => c !== q).map((c) => `<span class="fchip mono">${c}</span>`).join('');
+    $('#list').innerHTML = hits.map((r) => `<div class="row mono" data-k="${r.kind}" data-l="${r.label}"><span class="l">${r.kind} · ${r.label}</span><span class="v">${(r.detail || '').toUpperCase() || r.ds.toUpperCase()}</span></div>`).join('') || '<div class="row"><span class="l">No matches — refine.</span></div>';
+  };
+  $('#q').addEventListener('input', run); $('#run').addEventListener('click', run);
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('.row');
+    if (row && row.dataset.l) { $('#detail').innerHTML = `<strong>${row.dataset.l}</strong> <span class="mono" style="color:var(--text-muted)">context carried: [${$('#q').value}]</span><button class="act mono" id="ack">ACKNOWLEDGE → MITIGATE (act)</button><div class="mono" id="fb" style="color:var(--status-healthy-fg)"></div>`; }
+    if (e.target.id === 'ack') { $('#fb').textContent = '✓ ACKNOWLEDGED → MITIGATING — queue peek below updated (no reload)'; $('#queue').textContent = 'WORK QUEUE: Retry failed settlement batches (MITIGATING) · Drain hot Kafka partitions (ACK) · Review latency alert (MITIGATING)'; }
+  });
+  run();
+</script>
+</body>
+</html>

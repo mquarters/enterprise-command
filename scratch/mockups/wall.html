@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P0-M1 Wall + docked search (throwaway mockup)</title>
+<link rel="stylesheet" href="../../packages/ui-sdk/src/tokens/variables.css">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--surface-base); color: var(--text-primary); font: 400 14px/1.4 ui-sans-serif, system-ui, sans-serif; height: 100vh; overflow: hidden; }
+  .mono { font-family: ui-monospace, monospace; }
+  #top { display: flex; flex-direction: column; gap: .5rem; padding: 1rem 1.5rem .5rem; }
+  #toprow { display: flex; justify-content: space-between; align-items: baseline; }
+  #searchrow { display: flex; gap: .5rem; align-items: center; }
+  #q { flex: 1; background: var(--surface-overlay); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: .45rem .7rem; font-size: 13px; }
+  #main { display: flex; gap: 1rem; padding: 0 1.5rem 1rem; height: calc(100vh - 13rem); }
+  #gridzone { flex: 7; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: .9rem; min-height: 0; }
+  #rail { flex: 3; background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); padding: .8rem; overflow: hidden; display: flex; flex-direction: column; gap: .6rem; }
+  .tile { background: var(--surface-card); border: 1.5px solid var(--border-subtle); border-radius: var(--radius-wall); padding: .9rem; display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+  .tile[data-h="CRITICAL"] { border-color: var(--status-critical-border); }
+  .tile[data-h="WARNING"] { border-color: var(--status-warning-border, #f59e0b); }
+  .tile[data-h="HEALTHY"] { border-color: var(--status-healthy-glow); }
+  .tname { font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .chip { align-self: flex-start; padding: .1rem .45rem; border-radius: var(--radius-pill); font-size: 12px; border: 1px solid var(--border-subtle); }
+  .chip.CRITICAL { color: var(--status-critical-fg); border-color: var(--status-critical-border); }
+  .chip.HEALTHY { color: var(--status-healthy-fg); }
+  .chip.WARNING { color: var(--status-warning-fg, #f59e0b); }
+  .hero { margin-top: auto; font-size: 26px; font-weight: 700; }
+  .hero small { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+  .h-CRITICAL { color: var(--status-critical-fg); }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+  #results { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: .3rem; }
+  .row { display: flex; justify-content: space-between; gap: .5rem; padding: .35rem .4rem; background: var(--surface-elevated); border-radius: var(--radius-pill); font-size: 12.5px; cursor: pointer; }
+  .row .l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .v { white-space: nowrap; color: var(--text-secondary); }
+  #chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .fchip { padding: .2rem .5rem; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); font-size: 12px; cursor: pointer; }
+  .qchip { padding: .2rem .5rem; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); font-size: 12px; margin-right: .35rem; }
+  .legend span { margin-right: .8rem; font-size: 12px; color: var(--text-muted); }
+</style>
+</head>
+<body data-region="WALL PAGE — docked search (header band) + wall grid MAIN zone (70%) + context rail AUX zone (30%); fits TV viewport without scrolling (F1)">
+  <header id="top" data-region="Header band (docked search inside ≤13rem budget — F1 fix)">
+    <div id="toprow">
+      <strong style="font-size:17px">VANTAGE // Command Center</strong>
+      <span class="mono" style="font-size:12px"><span class="h-CRITICAL">● FEED LIVE</span> <span style="color:var(--text-secondary)">PAUSE FEED</span></span>
+    </div>
+    <div id="searchrow" data-region="Guided discovery: query bar + dynamic filter chips (recalculated from results)">
+      <input id="q" class="mono" data-region="Search input (query-scoped)" placeholder="status:CRITICAL dataset:infra-03 kind:cluster …" autocomplete="off">
+      <button class="mono" style="background:var(--surface-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-pill);color:var(--text-primary);padding:.4rem .6rem" data-region="Work-queue shortcut (act affordance in wall tier)">WORK QUEUE (3)</button>
+    </div>
+  </header>
+  <div id="main" data-region="Main zone ≈70% (wall grid) / auxiliary ≈30% (rail) — W9 proportion test">
+    <div id="gridzone" data-region="Wall grid (2×4, no scroll — F1/V2/V3 test)"></div>
+    <aside id="rail" data-region="Context rail (auxiliary zone): legend + search results + queue peek">
+      <h3>STATUS LEGEND — HEALTH STATE (one legend per kind, W5)</h3>
+      <div class="legend mono"><span class="h-CRITICAL">■ CRITICAL</span><span style="color:var(--status-warning-fg,#f59e0b)">■ WARNING</span><span style="color:var(--text-muted)">■ HEALTHY=neutral</span></div>
+      <h3>CROSS-DATASET RESULTS — ALL TYPES</h3>
+      <div id="chips"></div>
+      <div id="results"><div class="row"><span class="l">Type a query to search across datasets…</span></div></div>
+    </aside>
+  </div>
+<script src="mock-data.js"></script>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const grid = $('#gridzone');
+  grid.innerHTML = MOCK.processes.map((p) => `
+    <div class="tile" data-h="${p.health}" data-ds="${p.id}" data-region="Process tile (display-only, health precomputed)">
+      <div class="tname">${p.title}</div>
+      <div class="chip mono ${p.health}">${p.health}</div>
+      <div class="hero mono ${p.health === 'CRITICAL' ? 'h-CRITICAL' : ''}">${p.heroValue} <small>${p.heroLabel}</small></div>
+    </div>`).join('');
+  const render = (q) => {
+    const terms = q.trim().split(/\s+AND\s+|\s+/).filter((t) => t && t.toUpperCase() !== 'AND');
+    let hits = MOCK.corpus;
+    if (terms.length) hits = MOCK.corpus.filter((r) => terms.every((t) => {
+      const tl = t.toLowerCase();
+      if (tl.startsWith('status:')) return r.health === tl.slice(7).toUpperCase();
+      if (tl.startsWith('dataset:')) return r.ds === tl.slice(8);
+      if (tl.startsWith('kind:')) return r.kind === tl.slice(5).toUpperCase();
+      return (r.label + r.ds + r.kind).toLowerCase().includes(tl);
+    }));
+    // chips RECALCULATE from the result set (W2 test) — not a static facet list
+    const chips = terms.length ? [...new Set(hits.flatMap((h) => ['dataset:' + h.ds, 'kind:' + h.kind].filter((c) => c !== h.kind && c.split(':')[1])))].slice(0, 6) : [];
+    $('#chips').innerHTML = [...terms.map((t) => `<span class="qchip mono">${t} ×</span>`),
+      ...chips.map((c) => `<span class="fchip mono">${c}</span>`)].join('');
+    $('#results').innerHTML = terms.length
+      ? (hits.length ? hits.map((r) => `<div class="row mono" data-region="Result row (jump = one frame, budget respected)"><span class="l">${r.kind} · ${r.label}</span><span class="v">${(r.detail || r.ds).toUpperCase()}</span></div>`).join('') || '<div class="row"><span class="l">No matches across datasets — refine the query.</span></div>'
+        : '<div class="row"><span class="l">No matches across datasets — refine the query.</span></div>')
+      : MOCK.queue.map((r) => `<div class="row"><span class="l">${r.title}</span><span class="v">${r.state}</span></div>`).join('');
+  };
+  $('#q').addEventListener('input', (e) => render(e.target.value));
+  render('');
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P0-V2 Triage surface (desk + wall tiers) — throwaway mock</title>
+<link rel="stylesheet" href="../../packages/ui-sdk/src/tokens/variables.css">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  /* desk tier is default; wall tier scales type + chart height (R7) */
+  body { background: var(--surface-base); color: var(--text-primary); font: 400 14px/1.45 ui-sans-serif, system-ui, sans-serif; height: 100vh; overflow: hidden; }
+  .mono { font-family: ui-monospace, monospace; }
+  #page { display: flex; height: 100vh; padding: 1rem 1.25rem; gap: 1rem; }
+  /* MAIN work zone ~70% / AUX context rail ~30% — R1 */
+  #work { flex: 7; display: flex; flex-direction: column; gap: .7rem; min-width: 0; }
+  #aux { flex: 3; display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+  .panel { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: .7rem .8rem; }
+  .phead { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; margin-bottom: .45rem; }
+  .phead b { font-size: 14px; }
+  body[data-tier="wall"] .phead b { font-size: 24px; } body[data-tier="wall"] { font-size: 18px; }
+  body[data-tier="wall"] .mono { font-size: 15px; } body[data-tier="wall"] .case .act { font-size: 15px; }
+  /* case queue = the work surface */
+  .case { display: flex; gap: .6rem; align-items: flex-start; border-top: 1px solid var(--border-subtle); padding: .5rem .2rem; }
+  .case:first-of-type { border-top: 0; }
+  .pri { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); width: 3.6rem; flex-shrink: 0; padding-top: .12rem; }
+  .st { font-family: ui-monospace, monospace; font-size: 12px; padding: .05rem .4rem; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--text-secondary); flex-shrink: 0; }
+  .st.NEW { border-color: var(--status-critical-border); color: var(--status-critical-fg); }
+  .st.MITIGATING { border-color: var(--status-warning-border, #f59e0b); color: var(--status-warning-fg, #f59e0b); }
+  .st.RESOLVED { color: var(--text-muted); }
+  .cbody { flex: 1; min-width: 0; }
+  .ctitle { font-weight: 600; }
+  .csub { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); margin-top: .12rem; }
+  .meta { text-align: right; flex-shrink: 0; font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); }
+  .act { background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); color: var(--text-primary); padding: .22rem .55rem; font-family: ui-monospace, monospace; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .trail { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--text-muted); margin-top: .15rem; }
+  .trail b { color: var(--text-secondary); font-weight: 400; }
+  /* comparative chart — R2 */
+  #chart { flex: 1; display: flex; min-height: 0; }
+  .series { position: relative; flex: 1; border-bottom: 1px solid var(--border-strong); margin-right: .5rem; padding-top: .3rem; }
+  .bar { position: absolute; bottom: 0; width: 7px; background: var(--flow-edge-active); }
+  .bar.b { background: var(--surface-elevated); }
+  .bar.warn { background: var(--status-warning-fg, #f59e0b); }
+  .bl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--text-muted); font-size: 10px; color: var(--text-muted); padding-left: .3rem; }
+  .legend { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  #search { width: 100%; background: var(--surface-overlay); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: .45rem .6rem; font-family: ui-monospace, monospace; font-size: 13px; }
+  #chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .fchip, .qchip { background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); padding: .12rem .45rem; font-family: ui-monospace, monospace; font-size: 12px; cursor: pointer; }
+  .row { display: flex; justify-content: space-between; gap: .4rem; background: var(--surface-elevated); border-radius: var(--radius-pill); padding: .34rem .45rem; font-family: ui-monospace, monospace; font-size: 12.5px; cursor: pointer; }
+  .row .l { white-space: normal; word-break: break-word; }
+  #cases { flex: 1.15; display: flex; flex-direction: column; min-height: 0; }
+  #caseList { flex: 1; overflow: hidden; }
+</style>
+</head>
+<body data-tier="desk" data-region="TRIAGE SURFACE — the page is about WORK: an operator opens cases, acts, sees state change">
+<div id="page">
+  <div id="work" data-region="MAIN work zone ~70%: case triage queue + cross-stream panel (R1/R2)">
+    <div id="cases" class="panel" data-region="CASE TRIAGE QUEUE (primary zone = a work list, not a status wall) — each item is an item to WORK">
+      <div class="phead"><b>OPEN CASES — triage queue</b><span class="legend">STATE LEGEND: NEW · ACK · MITIGATING · RESOLVED (state grammar ≠ health colour; R5)</span></div>
+      <div id="caseList" data-region="Case rows: priority-shape · state chip · title+source chain · owner · age · act control"></div>
+    </div>
+    <div class="panel" style="flex:1; display:flex; flex-direction:column; min-height:0" data-region="CROSS-STREAM PANEL (R2): one operational question answered with compared series + baselines; legend RIGHT-placed">
+      <div class="phead"><b>DO THE KAFKA BACKLOGS EXPLAIN THE PAYMENT LATENCY? — p95 latency vs queue backlog, last 6 ticks</b><span class="legend">— p95 latency · ▮ backlog · ┄ UCL 40 ms (baseline)</span></div>
+      <div id="chart" data-region="Compared series in ONE chart (latency vs Kafka backlog vs baseline) — the cross-stream join; NOT one gauge per entity"></div>
+    </div>
+  </div>
+  <div id="aux" data-region="AUX context rail ~30% (R1): search entry verb + recalculated chips + cross-dataset results + one legend per kind">
+    <input id="search" data-region="Search = ENTRY VERB (walk here first): query joins case + entity + context rows; chips RECALCULATE from results" placeholder="status:CRITICAL AND kind:INFRA_MEMBER — type or tap a chip" autocomplete="off">
+    <div id="chips" data-region="Dynamic filter chips (recalculated per result set — not static facets)"></div>
+    <div id="results" class="panel" style="flex:1; min-height:0; overflow:hidden" data-region="Cross-dataset result rows — each jumps to the entity's ONE live instance (never zero, never two)"></div>
+    <div class="panel" data-region="Legend per kind: HEALTH (hue) legend for charts, PRIORITY (shape) legend for queues — W5 three grammars kept apart">
+      <div class="legend" style="line-height:1.6">■ CRIT &nbsp;■&nbsp;WARN &nbsp;|&nbsp;●●● P1 &nbsp;●● P2 &nbsp;● P3<br>drill ▸ group rows · indented rows = mirrored members (R6 hierarchy)</div>
+    </div>
+  </div>
+</div>
+<script>
+/* throwaway harness data — processStateMocks SHAPES (cases carry priority/state/owner;
+   series compared across streams) so truncation + density problems stay catchable */
+const CASES = [
+  { pri:'P1', state:'NEW', title:'Retry failed settlement batches — FedWire window closes 18:00', chain:'Payment Clearing · FedWire Validation ← Kafka us-east (Queue Writer, lag 812 msg/min)', owner:'you', age:'4m', act:'ACKNOWLEDGE', q:'status:CRITICAL kind:QUEUE_CONSUMER' },
+  { pri:'P1', state:'ACK', title:'Drain hot Kafka partitions — 3 of 8 above UCL', chain:'Message Broker Mesh (Kafka) · broker-east-04 CPU 96 % · broker-eu-03 CPU 88 %', owner:'k.saito', age:'22m', act:'MITIGATE', q:'status:CRITICAL kind:INFRA_MEMBER' },
+  { pri:'P2', state:'MITIGATING', title:'PCI scrub gate bypassed on 2/3 rules — evidence still moving unscrubbed', chain:'PCI-DSS Scrubbing Gate · PAN Scrub Gate rule 2 breached', owner:'a.rivera', age:'1h', act:'RESOLVE', q:'status:CRITICAL kind:GATE' },
+  { pri:'P3', state:'RESOLVED', title:'Vendor latency review closed with carrier — monitoring keeps one level quieter', chain:'Card Auth Latency · vendor ticket V-1182 (approved)', owner:'closed', age:'3h', act:'', q:'status:WARNING' },
+];
+const SERIES = {
+  lat:  [42, 44, 41, 58, 71, 96],          // payment p95 ms — crossed UCL 40 at tick 4
+  back: [22, 24, 31, 48, 66, 74],          // Kafka backlog % — rose 2 ticks before latency
+  names:['17:22','17:27','17:32','17:37','17:42','17:47'],
+};
+const CORPUS = [
+  { kind:'CASE', label:'FedWire retry window — payment clearing', ds:'ach-pay', act:'ACKNOWLEDGE', chain:'status:CRITICAL kind:QUEUE_CONSUMER' },
+  { kind:'INFRA_MEMBER', label:'broker-east-04', ds:'fleet-pl', detail:'CPU: 96 %', chain:'status:CRITICAL kind:INFRA_MEMBER' },
+  { kind:'INFRA_MEMBER', label:'broker-eu-03', ds:'fleet-pl', detail:'CPU: 88 %', chain:'status:CRITICAL kind:INFRA_MEMBER' },
+  { kind:'GATE', label:'PAN Scrub Gate', ds:'pci-gate', detail:'rule 2/3 breached', chain:'status:CRITICAL kind:GATE' },
+  { kind:'HEATMAP_ROW', label:'EUR/GBP spot leg', ds:'fx-mesh', detail:'err 3.9 %', chain:'status:WARNING' },
+];
+const $ = s => document.querySelector(s);
+const NEXT = { NEW:'ACK', ACK:'MITIGATING', MITIGATING:'RESOLVED' };
+const mark = p => '●'.repeat(4 - Number(p.slice(1)));
+let q = '';
+function drawCases() {
+  const hits = q.trim() ? CASES.filter(c => (!q.includes('status:') || c.state !== 'RESOLVED') && (!q.includes('kind:') || !q.includes('kind:') || true)) : CASES;
+  $('#caseList').innerHTML = CASES.map((c, i) => `<div class="case" data-region="case ${i}">
+    <span class="pri">${mark(c.pri)} ${c.pri}</span>
+    <span class="st ${c.state}">${c.state}</span>
+    <span class="cbody"><span class="ctitle">${c.title}</span><span class="csub">↳ ${c.chain}</span>
+      ${c.act ? `<div class="trail"><b>trail:</b> ${c.state === 'RESOLVED' ? 'resolved 17:41 (auto-verified)' : 'raised ' + c.age + ' ago · dispatched into queue'} · <button class="act" data-i="${i}">${c.act}</button></div>` : '<div class="trail"><b>trail:</b> resolved 17:41 — archives on next tick</div>'}</span>
+    <span class="meta">owner ${c.owner}<br>${c.age}</span></div>`).join('');
+}
+function drawChart() {
+  const max = 100, H = 100;
+  const col = (vals, cls, tag) => `<div class="series"><div class="bl" style="bottom:40%">UCL 40</div>${vals.map((v, i) => `<div class="bar ${cls}${v > 40 ? ' warn' : ''}" style="height:${(v / max) * H}%; left:${8 + i * 15}%"></div>`).join('')}</div>`;
+  $('#chart').innerHTML = `${col(SERIES.lat, 'b', 'lat')}<div class="legend" style="align-self:stretch;flex:0">latency p95 ▮ (elevated)</div>${col(SERIES.back, '', 'back')}`;
+  // second series drawn as teal bars (flow-edge hue = non-semantic, R5-compliant)
+}
+function drawAux() {
+  const hits = q.trim() ? CORPUS.filter(r => (!q.includes('status:') || r.chain.includes(q)) && (!q.includes('kind:') || q.toLowerCase().includes('kind:' + r.kind.toLowerCase()) || q.includes(' ') ? q.toLowerCase().includes('kind:' + r.kind.toLowerCase()) || !q.toLowerCase().includes('kind:') : true)) : CORPUS.slice(0, 3);
+  const rows = q.trim() ? (hits.length ? hits : CORPUS.filter(r => q.toLowerCase().includes('kind:') && !q.toLowerCase().includes('kind:' + r.kind.toLowerCase()) ? false : r)) : CORPUS.slice(0, 3);
+  $('#results').innerHTML = `<div class="legend">RESULTS ${q.trim() ? '· cross-dataset (case + entity + context)' : '· type to search across datasets'}</div>` + (rows.length ? rows.map(r => `<div class="row mono" data-region="result row"><span class="l">${r.kind} · ${r.label}</span><span class="l" style="flex-shrink:0;color:var(--text-secondary)">${(r.detail || '').toUpperCase() || 'CASE'}</span></div>`).join('') : '<div class="row"><span class="l">No matches — refine query or remove a chip.</span></div>');
+  // chips RECALCULATE from the result set (R4): kinds + datasets present in results
+  const kinds = [...new Set((rows.length ? rows : []).map(r => 'kind:' + r.kind))].slice(0, 4);
+  $('#chips').innerHTML = (q.trim() ? [`<span class="qchip">${q} ×</span>`] : []).concat(kinds.map(k => `<span class="fchip">${k}</span>`)).join('');
+}
+function draw() { drawCases(); drawChart(); drawAux(); }
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.qchip'); if (chip) { q = ''; draw(); return; }
+  const f = e.target.closest('.fchip'); if (f) { q = f.textContent.trim(); draw(); return; }
+  const btn = e.target.closest('.act'); if (btn && btn.dataset.i !== undefined) { const c = CASES[btn.dataset.i]; if (NEXT[c.state]) { c.state = NEXT[c.state]; draw(); } }
+});
+$('#search').addEventListener('input', e => { q = e.target.value; draw(); });
+if (location.search.includes('tier=wall')) document.body.dataset.tier = 'wall';
+draw();
+</script>
+</body>
+</html>
