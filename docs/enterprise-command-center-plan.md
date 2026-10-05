@@ -30,16 +30,20 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
 
 ### P1 — Discovery spine (search → filter chips → results) [W2, W3, W9]
 - **Build**: global search bar (Shell header, top-left reading axis) parsing Boolean grammar
-  (`status:CRITICAL AND dataset:infra-03 AND tag:payments`); query-scoped filter chips
-  (chips *modify results*, unlike navigation chips); cross-dataset result list joining
+  (`status:CRITICAL AND dataset:infra-03 AND kind:cluster`); query-scoped filter chips
+  (chips *modify results*, unlike navigation chips) whose offered refinements are
+  RECALCULATED from each result set — a static facet list is the NOC pattern and fails
+  canon W2's tightened test ("search choices… recalculated" — Oracle guides, ref 5);
+  cross-dataset result list joining
   processes, fleet entities, and narrative context; results deep-link to the entity's
   existing live instance (one-live-instance rule untouched).
 - **Data**: search corpus + query evaluator live in `processStateMocks`/mocks layer —
   the UI renders result sets, never computes them (Principle 1).
 - **Tokens/CSS**: query bar and result rows compose from existing scales; new tokens need
   consumers before shipping (audit R5/R6 discipline).
-- **Accept**: typing one query from any top-level surface returns a usable result set;
-  empty-state and no-match feedback exist (audit R4 pattern); zero second live instance.
+- **Accept**: typing one query from any top-level surface returns a usable result set
+  whose refinement options were recomputed from the result (W2 test); empty-state and
+  no-match feedback exist (audit R4 pattern); zero second live instance.
 
 ### P2 — Act loop (queue + action overlay + feedback) [W1, W6, W10]
 - **Build**: work-queue rail (persistent context panel, secondary zone per W9) holding
@@ -51,7 +55,9 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
   queue state (live badge semantics unchanged).
 - **Accept**: from any degraded cell an operator starts a resolution in ≤2 interactions;
   queue state persists across navigation without page reloads (prompt §Key bullet 3);
-  alert-management journey (initial access → analysis → alert management) walkable (W10).
+  acting from a search result or drill carries the discovery context to its act target
+  (pre-populated, no re-querying — canon W1's source wording); alert-management journey
+  (initial access → analysis → alert management) walkable (W10).
 
 ### P3 — Analysis density (comparative charts, priority grammar) [W4, W5]
 - **Build**: STATISTICAL reshape to multi-metric (peer/baseline comparison series,
@@ -70,7 +76,9 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
   mobile drawer (full-width sheet instead of 480px rail); TV-type pairing tier (title/label
   and legend/caption sizes at wall distance — fold-in deferred **M2**); spacing-scale family
   `--sp-1…6` replacing ad-hoc gap/padding literals (fold-in deferred **M1**); per-surface
-  primary-zone declarations checked against sightline order (W9).
+  primary-zone declarations checked against sightline order and the source's proportions
+  (main ~70% / auxiliary ~30%, borderless chart/summary layers, legends right-placed —
+  canon W9's tightened test, refs 5/7/8).
 - **Accept**: zero clipped/truncated values at 390×844, 1440×900, 1920×1080; spacing
   literals either on the scale or logged as exceptions; sweep harness gains the mobile viewport.
 
