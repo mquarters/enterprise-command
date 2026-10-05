@@ -28,15 +28,24 @@ can be checked against them without re-reading the prompt file.
 
 **W1 — The act loop closes.** Surfaces permit *direct task resolution or navigation to
 transaction screens without page reloads* via contextual pop-ups, sliding drawers, and inline
-views (prompt §Key Components, Action-Driven Overlays, refs [2, 6]). A degraded entity is an
-*item to work*, not a thing to view. **Pass:** from any red cell an operator starts a
-resolution action in ≤2 interactions, and the result persists as a queued/tracked task.
+views (prompt §Key Components, Action-Driven Overlays, refs [2, 6]). Verified against the
+Oracle ECC guides (ref 2/3/5): transaction screens open **pre-populated with the result of
+the discovery that led there — "no re-querying"** — so the act target must inherit the
+query's context, not restart it. A degraded entity is an *item to work*, not a thing to
+view. **Pass:** from any red cell an operator starts a resolution action in ≤2
+interactions, the result persists as a queued/tracked task, and acting from a search
+result carries its filter context (no re-query).
 **Now:** FAIL — drill and chips only navigate; mitigation buttons (RuleGate/Flow) resolve nothing and leave no trace.
 
 **W2 — Guided discovery exists.** A consumer-like search bar with Boolean parameters and
 dynamic filter chips is a first-class way *in* (prompt §Key Components, Guided Discovery,
-refs [2, 5]). **Pass:** `status:CRITICAL AND dataset:infra-03` typed once returns a usable
-result set. **Now:** FAIL — the only "search" is walking the trail stack; `SmartLaunchers`
+refs [2, 5]). Verified against the Oracle guides: **"with each drill-down or search
+refinement, the data engine recalculates indicators, tag clouds, charts, and search
+choices … to provide the user with new information on which to base the next discovery
+steps"** — the source meaning of *dynamic* is that chips and further search options are
+RECALCULATED per refinement; a static filter set does not satisfy the standard.
+**Pass:** `status:CRITICAL AND dataset:infra-03` typed once returns a usable
+result set whose refinement options were recomputed from the result. **Now:** FAIL — the only "search" is walking the trail stack; `SmartLaunchers`
 chips are navigation shortcuts, not queries.
 
 **W3 — Discovery crosses datasets.** Multi-dataset lookups join operational streams —
@@ -82,7 +91,10 @@ clipped values; grids reflow per tier. **Now:** PARTIAL — desk+wall handled (p
 mobile absent; grids pinned to xl breakpoints.
 
 **W9 — Layout flow and hierarchy.** Top-down, left-to-right flow; header / main content /
-side panels as a deliberate hierarchy (prompt §3 Mockup Structure). **Pass:** each surface
+side panels as a deliberate hierarchy (prompt §3 Mockup Structure). Verified against the
+Oracle layout rules: **main content ~70% / auxiliary ~30% with "back-and-forth navigation
+not necessary"; charts, summary bars and tag clouds render borderless; chart legends
+always on the right for consistency.** **Pass:** each surface
 names its primary zone (what answers "is anything wrong?") and secondary context lives in
 panels, not floating over the work area. **Now:** PASS-with-debt — Shell header + right
 drawer already match the header/main/panel pattern (audit §3.1); the debt is content
@@ -120,3 +132,14 @@ there is no usage-guideline/versioning story; R7 was "document or delete," only 
 
 *Companion: `docs/design-system-audit.md` (token/visual evidence), `docs/terminology.md`
 (what "layer/depth/archetype" mean here), `docs/viewing-model-field-guide.md` (how to read a page).*
+
+*External verification pass (2026-10-04): the prompt's cited findings were re-checked at
+source — Oracle ECC Framework + User's Guide (refs 2/3/5: act loop, pre-populated
+transaction screens, guided discovery, recalculated search options, 70/30 layout, legend
+placement); Kesino Consoles (ref 7: visual-fatigue/contrast guidance, ISO-11064
+sightlines); One Diversified (ref 8: clutter-minimal "make complexity feel simple",
+video-wall and sightline scaling). Activu (ref 4) was Cloudflare-blocked — not
+contradicted, not confirmed. The prompt's "trellis scatter plots" wording could not be
+located verbatim on the cited Oracle page (summary bars, tag clouds, recalculating charts
+confirmed there) — W4 keeps it as prompt-file wording, not a source claim. No W-code
+needed a direction change; W1/W2/W9 tests were tightened to the sources' exact wording.*
