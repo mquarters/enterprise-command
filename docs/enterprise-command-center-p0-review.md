@@ -90,3 +90,33 @@ what a later implementation phase must build from.
 *Evidence files: docs/assets/mockups/{wall,workbench,mobile}-*{clean,annot}.png +
 manifest.json (git-ignored). Harness: scratch/mockups/ (throwaway, untracked). No
 shipped component, token, or mock file was touched building this pack.*
+
+## 7. Re-attempt (P0-v2) — command-center-genre triage surface, reference-first method
+
+*Added after the user's genre critique: §1-§6 mocks were NOC-genre (status mirrors with a
+search bar grafted on). The re-attempt composed the triage surface AFTER a reference pass
+(`scratch/mockups/reference-sheet.md` — Oracle layout rules + control-room ergonomics, each
+rule written as a composition directive).*
+
+**Page:** `scratch/mockups/triage.html` (desk 1440×900 + wall 1920×1080 via `?tier=wall`),
+one work surface at both scales. **Genre gate (first-time-viewer check, independent
+reviewer with no session context): PASS at both viewports** — the page is narratable as a
+workflow: "pick newest case → ACKNOWLEDGE → state chip advances, trail line written →
+check latency-vs-backlog chart against UCL baseline → resolve; right rail = search +
+recalculated chips + cross-dataset results." Verb-labeled act controls attached to items;
+state grammar kept separate from health color.
+
+| Check | Desk | Wall |
+|---|---|---|
+| Fits viewport / no scroll | PASS (fit=true) | PASS (fit=true) |
+| Truncated values | PASS (1 caught at first render — case title line — fixed to wrap, re-verified 0) | PASS (0) |
+| Console/page errors | PASS (0) | PASS (0) |
+| Primary zone = work surface, not status wall | **PASS** | **PASS** |
+| Act carries discovery context (no re-query) | PASS — query persists into act target (query bar present; reviewer's crop noted it as not prominent — layout note, not failure) | PASS |
+
+**Reviewer caveats recorded (not failures):** right-hand RESULTS panel is the passive half
+(read-only entity rows with CPU %) — acceptable because the PRIMARY zone is the queue;
+chart axis labels sit at the screenshot crop edge (fixed with wrap rule); chart bars are not
+click targets in the mock. **Decision log updated:** the genre failure mode (§1-§6 era) was
+"status-mirror grid as primary zone"; the re-attempt's decision matrix — cases-before-
+charts, compare-answers-question charts, search-as-entry-verb — is what closed it.
