@@ -109,4 +109,57 @@ named, before/after comparison, `npm run typecheck` = 0, dev server stopped.
   1440×900 with 0 console errors, score against W-codes; findings feed the plan revision —
   the spikes prove the plan's riskiest assumptions, they do not pre-build the conversion.
 
+## 5.5 Spike findings (evidence from the throwaway branch, not commitments)
+
+The spikes (Spike A search/chips/results; Spike B queue rail/act path) proved the plan's riskiest
+assumptions and surfaced four findings — recorded here so the implementation goal inherits them:
+
+- **F1 — vertical budget on TV.** Inserting the search bar made the wall scroll (the `100vh − 13rem`
+  grid calc predates the bar; bottom row clipped in `spike-tv-wall-idle`). P1 must dock the bar
+  into the header band or shorten the grid calc — W8 (scaling is designed, not accidental).
+- **F2 — floating content needs an opaque layer.** The result list rendered on `--surface-overlay`
+  (α .55) and the grid bled through behind the rows. Production result panels/lists need the
+  raised/elevated tier with shadow — audit R4 ("empty states and result feedback deserve their
+  own affordance") generalized: *content layers need elevation*, W7.
+- **F3 — workbench dead band.** With the queue rail beside a width-capped canvas, right-side dead
+  space appears (spike wb-queue shots). Production: rail docks as the persistent context panel
+  (W9 secondary zone), canvas flexes to fill — do not ship the flex-gap sketch as-is.
+- **F4 — priority grammar works.** The ●●●/●●/● shape marks stayed distinguishable from health
+  hues at both viewports (and read in one glance) — keep shape+text as the priority carrier and
+  add the hue family on top only if P3 scoring demands it, W5.
+
+## 6. Prompt-requirements coverage ledger (self-review vs `enterprise-command-center-prompt.md`)
+
+Every prompt item, addressed (A) or deferred (D) with justification + W-code served:
+
+| Prompt requirement | Status | Where / why (W-codes served) |
+|---|---|---|
+| Dashboard widgets | **A** | S2 keep-reduced: wall grid stays the awareness tier (W4, W7) |
+| Data-visualization panels | **A** | P1 cross-dataset result panel + P3 comparative reshapes (W3, W4) |
+| Interactive charts | **A** | P3 series-toggle/brush candidates; V26 group-title drill buttons preserved (W4) |
+| Alerts & notifications | **A** | P2 work-queue = the alert-management tier with persistent state (W1, W10) |
+| Input fields & dropdowns | **A-partial** | P1 search input + removable filter chips; free dropdowns **D** — chips + query grammar express the same filtering with fewer clicks; revisit only if a P-spike shows chips insufficient (W2, W6) |
+| Navigation & menu structures | **A** | trail stack kept (orientation tier); search added as second entry (W2, W9) |
+| Status indicators | **A** | one grammar per kind (status/priority/severity), per-kind legends (W5) |
+| Error handling & feedback | **A** | empty/no-match state (P1), inline error + retry on actions (P2); F2 carries the elevation rule forward (W7) |
+| Real-time data panels | **A** | heat-strip keep-or-replace decided by P3 scoring against W4 |
+| Task-management widgets | **A** | queue rail + queue substrate (P2) — task records, not decorations (W1, W10) |
+| Priority-level indicators | **A** | shape grammar shipped in spike (F4); hue family lands P3 with legend (W5) |
+| Contextual info badges | **A-partial** | legend/badge kind-grammars in P3; a full badge catalog **D** — no consumer proven yet (W5) |
+| Color palette | **A** | dark palette kept; priority hues added as separate family (W5, W7) |
+| Typography hierarchy | **A** | P4 TV pairing tier (title/label + legend/caption tiers; audit M2/M8 fold-in) (W7) |
+| Layout principles | **A** | P4 spacing family + sightline ordering; F3 docked-rail rule (W7, W8, W9) |
+| Iconography & symbols | **A-partial** | mono-glyph + shape affordances only (audit M6 spirit); full icon set **D** — prompt's own constraint is "avoid unnecessary decorative elements" (W7) |
+| Layout flow (top-down, left-right) | **A** | search on the reading axis (P1); rail/panels in secondary zones (W9) |
+| Component hierarchy (header/main/side) | **A** | header + main + side panels kept and extended — queue rail is the new side panel (W9) |
+| User journey (access→analysis→alert mgmt) | **A** | P2 acceptance: land → search → jump → drawer → workbench → mitigate → queue walkable end-to-end (spike proved the shape) (W10) |
+| Responsive + media queries | **A** | P4 mobile tier (~390×844) + below-lg reflow; F1 is the first regression this catches (W8) |
+| Utility classes for components | **A** | spikes composed from existing utilities; R2 discipline continues: new scales land with consumers (W11) |
+| Design-system README (purpose/scope, versioning + maintenance, usage guidelines) | **A** | P5: `docs/design-system.md` + token-ledger re-count + sweep-harness promotion — completes audit R7 (W12) |
+
+**Overall conclusion:** the prompt's four deliverables are mapped (component list → gap analysis
+§2–§3 + this plan §1–2; mockup overview → spikes A/B + P1/P2; CSS structure → P4 + F1–F3
+findings; documentation summary → P5 + the watermark canon). No prompt requirement is left
+unaddressed without a recorded deferral reason.
+
 *End of plan.*
