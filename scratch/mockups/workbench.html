@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P0-M2 Workbench + docked queue rail (throwaway mockup)</title>
+<link rel="stylesheet" href="../../packages/ui-sdk/src/tokens/variables.css">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--surface-base); color: var(--text-primary); font: 400 14px/1.4 ui-sans-serif, system-ui, sans-serif; height: 100vh; overflow: hidden; }
+  .mono { font-family: ui-monospace, monospace; }
+  #page { display: flex; flex-direction: column; height: 100vh; padding: 1rem 1.5rem; gap: .8rem; }
+  #crumb { display: flex; gap: .6rem; align-items: baseline; font-size: 13px; }
+  #crumb .b { background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); padding: .25rem .6rem; cursor: pointer; }
+  #mainrow { display: flex; gap: 1rem; flex: 1; min-height: 0; }
+  #canvaszone { flex: 1; background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: 1rem; display: flex; flex-direction: column; gap: .7rem; min-width: 0; }
+  #canvashead { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-subtle); padding-bottom: .5rem; }
+  #legend { color: var(--text-muted); font-size: 12px; }
+  #searchrow { display: flex; gap: .5rem; }
+  #q { flex: 1; background: var(--surface-overlay); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: .45rem .7rem; font-size: 13px; }
+  #regions { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: .7rem; flex: 1; min-height: 0; }
+  .region { border: 1.5px solid var(--border-subtle); border-radius: var(--radius-card); padding: .6rem; }
+  .region[data-h="CRITICAL"] { border-color: var(--status-critical-border); }
+  .region h4 { font-size: 13px; margin-bottom: .4rem; }
+  .cell { background: var(--surface-elevated); border-radius: var(--radius-pill); padding: .3rem .5rem; font-size: 12.5px; margin-bottom: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cell.C { border-left: 3px solid var(--status-critical-border); }
+  .cell.W { border-left: 3px solid var(--status-warning-border, #f59e0b); }
+  #rail { width: var(--drawer-width-entity); background: var(--surface-overlay); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); padding: .8rem; display: flex; flex-direction: column; gap: .55rem; }
+  #rail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+  .qrec { border-bottom: 1px solid var(--border-subtle); padding-bottom: .45rem; font-size: 12.5px; }
+  .qrec .t { color: var(--text-secondary); font-size: 11.5px; }
+  .pri { color: var(--text-secondary); }
+  .state { float: right; color: var(--text-muted); }
+  .act { margin-top: .35rem; display: block; background: var(--surface-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); color: var(--text-primary); padding: .25rem .6rem; font-size: 12px; cursor: pointer; }
+  #overlay { position: absolute; top: 9rem; right: 26rem; width: 26rem; background: var(--surface-overlay); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); padding: .9rem; display: none; }
+  #overlay .ctx { font-size: 11.5px; color: var(--text-muted); }
+  #feedback { font-size: 12px; color: var(--status-healthy-fg); }
+  button[data-act].err { border-color: var(--status-critical-border); color: var(--status-critical-fg); }
+</style>
+</head>
+<body data-region="WORKBENCH PAGE — canvas zone + docked queue rail (no dead band, F3 test); act path carries filter context (no re-query, W1 test)">
+<div id="page">
+  <nav id="crumb" data-region="Context trail (frames, not entity depth)">
+    <span class="b mono">← BACK ONE SCALE</span><span class="mono" style="color:var(--text-muted)">INFRASTRUCTURE (FLEET) › REGION VIEW — SRE WORKBENCH · HEALTH: CRITICAL</span>
+  </nav>
+  <div id="mainrow">
+    <div id="canvaszone" data-region="Canvas zone fills remaining width — rail is DOCKED, not floated (F3)">
+      <div id="searchrow" data-region="Workbench search slot (query from anywhere; result click = jump + act, no re-query)">
+        <input id="q" class="mono" data-region="Search input (workbench tier)" placeholder="status:CRITICAL AND kind:INFRA_MEMBER" autocomplete="off">
+        <button class="mono" style="background:var(--surface-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-pill);color:var(--text-primary);padding:.4rem .6rem">RESULTS</button>
+      </div>
+      <div id="canvashead">
+        <strong>FLEET REGIONS — 4 CLUSTERS, 12 CELLS (mirror of live instances)</strong>
+        <span id="legend" class="mono" data-region="Per-kind legend, RIGHT-placed on every canvas (W9 rule) — HEALTH STATES ONLY (W5: priority/severity get their own legends)">■ CRIT · ■ WARN · ○ HEALTHY/IDLE · ▲▼ TREND</span>
+      </div>
+      <div id="regions" data-region="Region grids — member cells are mirrors; ONE live instance per entity"></div>
+    </div>
+    <aside id="rail" data-region="Work-queue rail DOCKED at right = secondary zone (W9); no empty band between canvas and rail (F3)">
+      <h3>WORK QUEUE (3) — PRIORITY LEGEND ●●●/●●/● (own grammar, W5)</h3>
+      <div id="recs"></div>
+    </aside>
+  </div>
+</div>
+<div id="overlay" data-region="Act overlay — carries the search context it came FROM (status:CRITICAL chip persists; act needs no new query = no re-query, W1)">
+  <div class="ctx mono" id="ovctx"></div>
+  <div style="margin:.5rem 0" id="ovbody"></div>
+  <button class="act mono" data-act="ACKNOWLEDGE">ACKNOWLEDGE → MITIGATE → RESOLVE</button>
+  <button class="act mono" data-act="ESCALATE">ESCALATE (demo error feedback)</button>
+  <div id="feedback" class="mono"></div>
+</div>
+<script src="mock-data.js"></script>
+<script>
+  const $ = (s) => document.querySelector(s);
+  $('#regions').innerHTML = MOCK.regions.map((r) => `
+    <div class="region" data-h="${r.health}" data-region="Region panel (depth-2 mirror)">
+      <h4>${r.name} <span class="mono" style="color:var(--text-muted)">${r.health}</span></h4>
+      ${r.cells.map((c) => `<div class="cell mono ${c.includes('96') || c.includes('97') || c.includes('88') ? 'C' : 'W'}">${c}</div>`).join('')}
+    </div>`).join('');
+  const STATES = { NEW: 'ACK', ACK: 'MITIGATING', MITIGATING: 'RESOLVED' };
+  const mark = (p) => '●'.repeat(4 - Number(p.slice(1)));
+  const drawRecs = () => {
+    $('#recs').innerHTML = MOCK.queue.map((r, i) => `<div class="qrec"><span class="pri mono">${mark(r.pri)} ${r.pri}</span><span class="state mono">${r.state}</span><div>${r.title}</div><div class="t mono">${r.origin}</div>${r.state !== 'RESOLVED' ? `<button class="act mono" data-rec="${i}">${{ NEW: 'ACKNOWLEDGE', ACK: 'MITIGATE', MITIGATING: 'RESOLVE' }[r.state]}</button>` : '<div class="t mono">✓ RESOLVED — ARCHIVES ON NEXT TICK</div>'}</div>`).join('');
+  };
+  drawRecs();
+  const openOverlay = (row) => {
+    const q = $('#q').value.trim();
+    $('#ovctx').textContent = `CONTEXT CARRIED: ${q ? '[' + q + '] → ' : 'DIRECT DRILL → '}${row.kind} · ${row.label} · health ${row.health}`;
+    $('#ovbody').innerHTML = `<div>${row.label} — act target pre-populated from the query that found it (no re-query).</div><div class="mono" style="font-size:11.5px;color:var(--text-secondary)">${row.detail || ''}</div>`;
+    $('#feedback').textContent = '';
+    $('#overlay').style.display = 'block';
+  };
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('.row, .cell');
+    if (row && row.classList.contains('row')) { openOverlay(MOCK.corpus.find((c) => row.textContent.includes(c.label)) || MOCK.corpus[4]); return; }
+    if (row && row.classList.contains('cell')) { const [label, ...rest] = row.textContent.split('CPU'); openOverlay({ kind: 'INFRA_MEMBER', label: label.trim(), health: 'CRITICAL', detail: 'CPU' + rest.join('CPU') }); return; }
+    const btn = e.target.closest('.act');
+    if (!btn) return;
+    if (btn.dataset.rec !== undefined) { const r = MOCK.queue[btn.dataset.rec]; r.state = STATES[r.state]; drawRecs(); }
+    else if (btn.dataset.act === 'ESCALATE') { $('#feedback').style.color = 'var(--status-critical-fg)'; $('#feedback').textContent = '✕ ESCALATION FAILED — VENDOR TICKET API 504 · RETRY?'; }
+    else $('#feedback').style.color = 'var(--status-healthy-fg)', $('#feedback').textContent = '✓ ACKNOWLEDGED → MITIGATING → RESOLVED — queue state updated in place (no reload)';
+  });
+  $('#q').addEventListener('input', (e) => {
+    const q = e.target.value.trim(); if (!q) return;
+    const hits = MOCK.corpus.filter((r) => q.toLowerCase().includes('kind:' + r.kind.toLowerCase()) || r.health === 'CRITICAL' && q.toLowerCase().includes('status:critical') || q.toLowerCase().split(' ').some((t) => (r.label + r.ds).toLowerCase().includes(t)));
+    $('#results') && 0;
+    document.querySelectorAll('.cell').forEach((c) => { if (hits.some((h) => c.textContent.includes(h.label))) c.style.outline = '2px dashed var(--flow-edge-active)'; });
+  });
+</script>
+</body>
+</html>
